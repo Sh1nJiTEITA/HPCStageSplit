@@ -33,6 +33,9 @@ class HPC_SPLIT:
         mu = np.mean([0.95,0.97]),  # Коэффициент расхода сопловой решетки первой ступени  |
         Delta = Q(0.003, "meter"),  # Перекрыша между лопаткиами первой ступени            |
         ):
+        # Если что-то пошло не так
+        self.isOK            = True
+        
         
         # Входные величины ---------
         #self.fp_0_      = fp_0_
@@ -122,27 +125,30 @@ class HPC_SPLIT:
         # Основной расчет
         # 1 ~
         # 2
-        self.update_full_point_of_income_steam()
+        try:
+            self.update_full_point_of_income_steam()
         # 3
-        self.update_l_11_and_theta_11()
+            self.update_l_11_and_theta_11()
         # 4
-        self.update_l_21()
+            self.update_l_21()
         # 5
-        self.update_root_diameter()
+            self.update_root_diameter()
         # 6
-        self.update_steam_parameters_after_last_stage()
+            self.update_steam_parameters_after_last_stage()
         # 7
-        self.update_l_2z()
+            self.update_l_2z()
         # 8
-        self.update_d_2z()
+            self.update_d_2z()
         # 9
-        self.update_parameters_of_first_and_last_stage()
+            self.update_parameters_of_first_and_last_stage()
         # 10
-        self.update_heat_transfer()
+            self.update_heat_transfer()
         # 11
-        self.update_Delta_of_heat_transfer()
+            self.update_Delta_of_heat_transfer()
         # 12
-        self.update_heat_transfer_via_Delta()
+            self.update_heat_transfer_via_Delta()
+        except Exception:
+            self.isOK = False
         
         
     # 2. Энтропия и температура пара перед первой ступенью
@@ -203,7 +209,7 @@ class HPC_SPLIT:
                 percent_difference = (theta/(self.d_1/l_11) - 1)
 
             # Если условие выполнилось - выходим из цикла
-            if (np.abs(percent_difference) < 0.01):
+            if (np.abs(percent_difference) < 0.015):
                 self.theta               = theta
                 self.iterations_number   = iterations_number
                 self.percent_difference  = percent_difference
@@ -441,6 +447,8 @@ def get_auto_number_of_stages_split(
             
             Z = local_z
         )
+        if not(it_split.isOK):
+            return it_split
         
         if (np.abs(it_split.Z_new-local_z) > 1): 
             local_z = int(it_split.Z_new.m)
@@ -602,8 +610,12 @@ def calculate_hpc_split_in_ranges(
             #     Z_vec[rho_k_it][alpha_1eef_it] = str(loc_split.Z_new.m) + "(Y)"
             # else:
             #     Z_vec[rho_k_it][alpha_1eef_it] = str(loc_split.Z_new.m) + "(N)"
-            l_11_vec[rho_k_it][alpha_1eef_it] = loc_split.l_11.m
-            Z_vec[rho_k_it][alpha_1eef_it] = loc_split.Z_new.m
+            if not(loc_split.isOK):
+                l_11_vec[rho_k_it][alpha_1eef_it] = -1.0
+                Z_vec[rho_k_it][alpha_1eef_it] = loc_split.Z
+            else:
+                l_11_vec[rho_k_it][alpha_1eef_it] = loc_split.l_11.m
+                Z_vec[rho_k_it][alpha_1eef_it] = loc_split.Z_new.m
             rho_k_vec[rho_k_it][alpha_1eef_it] = rho_k_split[rho_k_it].m
             alpha_1eef_vec[rho_k_it][alpha_1eef_it] = alpha_1eef_split[alpha_1eef_it].m
             
@@ -838,13 +850,18 @@ def generate_table_of_split_data_in_tex(d_1, rho_k_vec, alpha_1eef_vec, Z_vec, l
         data_row_str = r"" + str(alpha_1eef_vec_table[i]) + r" & " + '\t'
         for j in range(0, len(rho_k_vec_table)):
             # \textbf
-            if (((abs(int(Z_vec[j][i]) - Z_vec[j][i])) < 0.1)and(l_11_vec[j][i] >= 0.013)):
-                data_row_str += r"\textbf{"
-                data_row_str += str(round(Z_vec[j][i], 2)) + r"|" + str(round(l_11_vec[j][i], 4))
-                data_row_str += r"}"
+            if (l_11_vec[j][i] == -1.0):
+                data_row_str += r"Нет"
             else:
-                data_row_str += str(round(Z_vec[j][i], 2)) + r"|" + str(round(l_11_vec[j][i], 4))
+            
+                if (((abs(int(Z_vec[j][i]) - Z_vec[j][i])) < 0.1)and(l_11_vec[j][i] >= 0.013)):
+                    data_row_str += r"\textbf{"
+                    data_row_str += str(round(Z_vec[j][i], 2)) + r"|" + str(round(l_11_vec[j][i], 4))
+                    data_row_str += r"}"
+                else:
+                    data_row_str += str(round(Z_vec[j][i], 2)) + r"|" + str(round(l_11_vec[j][i], 4))
             if not(j == (len(rho_k_vec_table) - 1)): data_row_str += r" & " + '\t'
+        
         data_row_str += r"\\"
         main_data_string+=('\t' + data_row_str + '\n')
     main_data_string+=(r"\end{tabular}" + "\n")
@@ -863,20 +880,57 @@ def generate_table_of_split_data_in_tex(d_1, rho_k_vec, alpha_1eef_vec, Z_vec, l
 #         etaHPC_oi   = 0.846
 #     )
 
-Point_0_ = TCPv2.ThPoint(p=Q(9, "MPa"),t=Q(571, "degC"))
-Point_0  = TCPv2.ThPoint(p=Q(8.73, "MPa"), h=Point_0_.h())
+# d_split = np.arange(1, 1.2, 0.1)
+# d_split = Q(d_split, "meter")
+# splits_data = []
 
-eee = calculate_hpc_split_in_ranges(
-        d_1 = 0.6*un('meter'),        
-        rho_k_range=(0.03,0.07, 0.01),      
-        alpha_1eef_range=(9,20, 1),       
-        fp_0        = Q(8.73, "MPa"),
-        fh_0        = Point_0.h(),
-        n           = Q(90, "1/s"),
-        G_0         = Q(38.88, "kg/s"),
-        p_z         = Q(1.8, "MPa"),
-        etaHPC_oi   = 0.846
-    )
+# for i in range(0, len(d_split)):
+#     splits_data.append(calculate_hpc_split_in_ranges(
+#         d_1 = d_split[i],        
+#         rho_k_range=(0.05,0.07,0.01),      
+#         alpha_1eef_range=(12,20, 1),       
+        
+#         fp_0        = Q(0.582, "MPa"),
+#         fh_0        = Q(2860.1, "kJ/kg"),
+        
+#         n           = Q(50, "1/s"),
+#         G_0         = Q(84.96, "kg/s"),
+#         p_z         = Q(0.16, "MPa"),
+#         etaHPC_oi   = 0.892
+#     ))
+
+
+
+# a = []
+# d_split = np.arange(0.6, 0.9, 0.1)
+# d_split = Q(d_split, "meter")
+# for i in range(0, len(d_split)):
+#     a.append(calculate_hpc_split_in_ranges(
+#         d_1 = d_split[i],        
+#         rho_k_range=(0.05,0.07, 0.01),      
+#         alpha_1eef_range=(9,20, 1),       
+#         fp_0        = Q(0.485, "MPa"),
+#         fh_0        = Q(2867, "kJ/kg"),
+#         n           = Q(90, "1/s"),
+#         G_0         = Q(47.93, "kg/s"),
+#         p_z         = Q(0.25, "MPa"),
+#         etaHPC_oi   = 0.887
+#     ))
+
+# Point_0_ = TCPv2.ThPoint(p=Q(9, "MPa"),t=Q(571, "degC"))
+# Point_0  = TCPv2.ThPoint(p=Q(8.73, "MPa"), h=Point_0_.h())
+
+# eee = calculate_hpc_split_in_ranges(
+#         d_1 = 0.6*un('meter'),        
+#         rho_k_range=(0.03,0.07, 0.01),      
+#         alpha_1eef_range=(9,20, 1),       
+#         fp_0        = Q(8.73, "MPa"),
+#         fh_0        = Point_0.h(),
+#         n           = Q(90, "1/s"),
+#         G_0         = Q(38.88, "kg/s"),
+#         p_z         = Q(1.8, "MPa"),
+#         etaHPC_oi   = 0.846
+#     )
 # # save_split_data_in_tex(
 # #     0.6,
 # #     ddd[0],

@@ -274,12 +274,12 @@ def display_latex_ex_2(data):
 #         ("D", 550)
 #     ]
 # ))
-'''
+# '''
 
-TEXT HEAR
+# TEXT HEAR
 
-'''
-abc = Q(np.array([10, 30, 20, 40]), 'meter')
+# '''
+# abc = Q(np.array([10, 30, 20, 40]), 'meter')
 # print(abc)
 
 # print(op_latex_output_2([
@@ -289,6 +289,6 @@ abc = Q(np.array([10, 30, 20, 40]), 'meter')
 #     ("d1", ThPoint(p=4, t=550))
 # ]))
 
-print(op_latex_output_2([
-    ('D ORIGIN', abc),
-]))
+# print(op_latex_output_2([
+#     ('D ORIGIN', abc),
+# ]))

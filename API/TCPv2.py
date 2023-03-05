@@ -409,7 +409,7 @@ def MakeThArr(
 
             local_input_id.append(it)
             
-    print(len(local_input_id))
+    #print(len(local_input_id))
     local = []
     for itf,its in zip(input_values[local_input_id[0]], input_values[local_input_id[1]]):    
         if ((local_input_id[0] == 0) and (local_input_id[1] == 1)):
@@ -447,7 +447,7 @@ def MakeThArr(
             continue
             
     tend = datetime.now()
-    print("time: {}".format(tend - t0))
+    #print("time: {}".format(tend - t0))
     return np.asarray(local) 
     #print()
     #print(local)

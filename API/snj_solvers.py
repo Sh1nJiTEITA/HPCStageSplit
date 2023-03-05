@@ -423,7 +423,7 @@ def solve__(exp, parameters, variable, list_mode=False):
 #lstr = "sqrt(d*(10+4)/(34 * k))" 
 #llstr = "sqrt(sqrt(a/b*(a+b)))"
 #lllstr = '(sqrt((sqrt((a**2+b)*100*c-1488*d+3228))/(0.5**0.5 + 0.25*c - 3826*d))/(sqrt(35.5*a*b)*sqrt(3561*d+a*b))'
-llllstr = 'sqrt(44)/sqrt(55)(10 + b)/(sqrt(sqrt(33+90)*10))'
+#llllstr = 'sqrt(44)/sqrt(55)(10 + b)/(sqrt(sqrt(33+90)*10))'
 #lllllstr = 'sqrt(sqrt(44) * 10 )'
 #print(llstr)
 # print(swap_sqrt_fast(llllstr))
