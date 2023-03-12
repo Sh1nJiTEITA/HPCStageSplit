@@ -1,7 +1,7 @@
 # Thermal Circuit Part
 from pint import get_application_registry
 import seuif97
-import seuif97plus
+#import seuif97plus
 import numpy as np
 
 def NO_DIM():  return 0
@@ -9,7 +9,7 @@ def DIM():     return 1
 
 def NUMBER_OF_TH_PARAM(): return 12
 
-
+__all__ = ['ThPoint']
 
 #Dictionary provides ID's of  __Parameters to work with IAPWS97(seuif97)
 
@@ -242,12 +242,12 @@ class ThPoint:
             elif (out_id == 5):  return seuif97.pt2s
             elif (out_id == 15): return seuif97.pt2x
             
-            elif (out_id == 2):  return seuif97plus.pt2rho
-            elif (out_id == 8):  return seuif97plus.pt2cp
-            elif (out_id == 9):  return seuif97plus.pt2cv
-            elif (out_id == 10): return seuif97plus.pt2a
-            elif (out_id == 11): return seuif97plus.pt2k
-            elif (out_id == 25): return seuif97plus.pt2kv
+            elif (out_id == 2):  return pt2rho
+            elif (out_id == 8):  return pt2cp
+            elif (out_id == 9):  return pt2cv
+            elif (out_id == 10): return pt2a
+            elif (out_id == 11): return pt2k
+            elif (out_id == 25): return pt2kv
             
         # (p, h)
         elif ((in_f_id == 0) and (in_s_id == 4)):
@@ -256,12 +256,12 @@ class ThPoint:
             elif (out_id == 5):  return seuif97.ph2s
             elif (out_id == 15): return seuif97.ph2x
             
-            elif (out_id == 2):  return seuif97plus.ph2rho
-            elif (out_id == 8):  return seuif97plus.ph2cp
-            elif (out_id == 9):  return seuif97plus.ph2cv
-            elif (out_id == 10): return seuif97plus.ph2a
-            elif (out_id == 11): return seuif97plus.ph2k
-            elif (out_id == 25): return seuif97plus.ph2kv
+            elif (out_id == 2):  return ph2rho
+            elif (out_id == 8):  return ph2cp
+            elif (out_id == 9):  return ph2cv
+            elif (out_id == 10): return ph2a
+            elif (out_id == 11): return ph2k
+            elif (out_id == 25): return ph2kv
         
         # (p, s)
         elif ((in_f_id == 0) and (in_s_id == 5)):
@@ -270,12 +270,12 @@ class ThPoint:
             elif (out_id == 1):  return seuif97.ps2t
             elif (out_id == 15): return seuif97.ps2x
             
-            elif (out_id == 2):  return seuif97plus.ps2rho
-            elif (out_id == 8):  return seuif97plus.ps2cp
-            elif (out_id == 9):  return seuif97plus.ps2cv
-            elif (out_id == 10): return seuif97plus.ps2a
-            elif (out_id == 11): return seuif97plus.ps2k
-            elif (out_id == 25): return seuif97plus.ps2kv
+            elif (out_id == 2):  return ps2rho
+            elif (out_id == 8):  return ps2cp
+            elif (out_id == 9):  return ps2cv
+            elif (out_id == 10): return ps2a
+            elif (out_id == 11): return ps2k
+            elif (out_id == 25): return ps2kv
         
         # (p, v)
         elif ((in_f_id == 0) and (in_s_id == 3)):
@@ -284,12 +284,12 @@ class ThPoint:
             elif (out_id == 5):  return seuif97.pv2s
             elif (out_id == 15): return seuif97.pv2x
             
-            elif (out_id == 2):  return seuif97plus.pv2rho
-            elif (out_id == 8):  return seuif97plus.pv2cp
-            elif (out_id == 9):  return seuif97plus.pv2cv
-            elif (out_id == 10): return seuif97plus.pv2a
-            elif (out_id == 11): return seuif97plus.pv2k
-            elif (out_id == 25): return seuif97plus.pv2kv
+            elif (out_id == 2):  return pv2rho
+            elif (out_id == 8):  return pv2cp
+            elif (out_id == 9):  return pv2cv
+            elif (out_id == 10): return pv2a
+            elif (out_id == 11): return pv2k
+            elif (out_id == 25): return pv2kv
         
         # (p, x)
         elif ((in_f_id == 0) and (in_s_id == 15)):
@@ -298,12 +298,12 @@ class ThPoint:
             elif (out_id == 5):  return seuif97.px2s
             elif (out_id == 1): return seuif97.px2t
             
-            elif (out_id == 2):  return seuif97plus.px2rho
-            elif (out_id == 8):  return seuif97plus.px2cp
-            elif (out_id == 9):  return seuif97plus.px2cv
-            elif (out_id == 10): return seuif97plus.px2a
-            elif (out_id == 11): return seuif97plus.px2k
-            elif (out_id == 25): return seuif97plus.px2kv
+            elif (out_id == 2):  return px2rho
+            elif (out_id == 8):  return px2cp
+            elif (out_id == 9):  return px2cv
+            elif (out_id == 10): return px2a
+            elif (out_id == 11): return px2k
+            elif (out_id == 25): return px2kv
         
         # (t, h)
         elif ((in_f_id == 1) and (in_s_id == 4)):
@@ -312,12 +312,12 @@ class ThPoint:
             elif (out_id == 5):  return seuif97.th2s
             elif (out_id == 15): return seuif97.th2x
             
-            elif (out_id == 2):  return seuif97plus.th2rho
-            elif (out_id == 8):  return seuif97plus.th2cp
-            elif (out_id == 9):  return seuif97plus.th2cv
-            elif (out_id == 10): return seuif97plus.th2a
-            elif (out_id == 11): return seuif97plus.th2k
-            elif (out_id == 25): return seuif97plus.th2kv
+            elif (out_id == 2):  return th2rho
+            elif (out_id == 8):  return th2cp
+            elif (out_id == 9):  return th2cv
+            elif (out_id == 10): return th2a
+            elif (out_id == 11): return th2k
+            elif (out_id == 25): return th2kv
         
         # (t, s)
         elif ((in_f_id == 1) and (in_s_id == 5)):
@@ -326,12 +326,12 @@ class ThPoint:
             elif (out_id == 0):  return seuif97.ts2p
             elif (out_id == 15): return seuif97.ts2x
             
-            elif (out_id == 2):  return seuif97plus.ts2rho
-            elif (out_id == 8):  return seuif97plus.ts2cp
-            elif (out_id == 9):  return seuif97plus.ts2cv
-            elif (out_id == 10): return seuif97plus.ts2a
-            elif (out_id == 11): return seuif97plus.ts2k
-            elif (out_id == 25): return seuif97plus.ts2kv
+            elif (out_id == 2):  return ts2rho
+            elif (out_id == 8):  return ts2cp
+            elif (out_id == 9):  return ts2cv
+            elif (out_id == 10): return ts2a
+            elif (out_id == 11): return ts2k
+            elif (out_id == 25): return ts2kv
         
         # (t, v)
         elif ((in_f_id == 1) and (in_s_id == 3)):
@@ -340,12 +340,12 @@ class ThPoint:
             elif (out_id == 5):  return seuif97.tv2s
             elif (out_id == 15): return seuif97.tv2x
             
-            elif (out_id == 2):  return seuif97plus.tv2rho
-            elif (out_id == 8):  return seuif97plus.tv2cp
-            elif (out_id == 9):  return seuif97plus.tv2cv
-            elif (out_id == 10): return seuif97plus.tv2a
-            elif (out_id == 11): return seuif97plus.tv2k
-            elif (out_id == 25): return seuif97plus.tv2kv
+            elif (out_id == 2):  return tv2rho
+            elif (out_id == 8):  return tv2cp
+            elif (out_id == 9):  return tv2cv
+            elif (out_id == 10): return tv2a
+            elif (out_id == 11): return tv2k
+            elif (out_id == 25): return tv2kv
         
         # (t, x)
         elif ((in_f_id == 1) and (in_s_id == 15)):
@@ -354,12 +354,12 @@ class ThPoint:
             elif (out_id == 5):  return seuif97.tx2s
             elif (out_id == 0): return seuif97.tx2p
             
-            elif (out_id == 2):  return seuif97plus.tx2rho
-            elif (out_id == 8):  return seuif97plus.tx2cp
-            elif (out_id == 9):  return seuif97plus.tx2cv
-            elif (out_id == 10): return seuif97plus.tx2a
-            elif (out_id == 11): return seuif97plus.tx2k
-            elif (out_id == 25): return seuif97plus.tx2kv
+            elif (out_id == 2):  return tx2rho
+            elif (out_id == 8):  return tx2cp
+            elif (out_id == 9):  return tx2cv
+            elif (out_id == 10): return tx2a
+            elif (out_id == 11): return tx2k
+            elif (out_id == 25): return tx2kv
         
         # (h, s)
         elif ((in_f_id == 4) and (in_s_id == 5)):
@@ -368,12 +368,12 @@ class ThPoint:
             elif (out_id == 1):  return seuif97.hs2t
             elif (out_id == 15): return seuif97.hs2x
             
-            elif (out_id == 2):  return seuif97plus.hs2rho
-            elif (out_id == 8):  return seuif97plus.hs2cp
-            elif (out_id == 9):  return seuif97plus.hs2cv
-            elif (out_id == 10): return seuif97plus.hs2a
-            elif (out_id == 11): return seuif97plus.hs2k
-            elif (out_id == 25): return seuif97plus.hs2kv
+            elif (out_id == 2):  return hs2rho
+            elif (out_id == 8):  return hs2cp
+            elif (out_id == 9):  return hs2cv
+            elif (out_id == 10): return hs2a
+            elif (out_id == 11): return hs2k
+            elif (out_id == 25): return hs2kv
         else:
             raise Exception("Invalid input thermal  __Parameters")
         
@@ -451,3 +451,212 @@ def MakeThArr(
     return np.asarray(local) 
     #print()
     #print(local)
+    
+    """
+Property_names_by_ID: dict = {
+    -0: "p",      # Pressure
+    -1: "t",      # Temperature
+    2: "rho",    # Density
+    -3: "v",      # Specific volume
+    -4: "h",      # Specific enthalpy
+    -5: "s",      # Specific entropy
+    8: "cp",     # Isobaric heat capacity
+    9: "cv",     # Isochoric heat capacity
+    10:"a",      # Sound velocity
+    11:"k",      # Isoentropy coefficient
+    -15:"x",      # Steam effiency (dryness)
+    25:"kv",     # Kinecic viscosity
+}
+"""
+
+# (p, t)
+def pt2cp(p,t):
+    return seuif97.pt(p,t,8)
+
+def pt2rho(p,t):
+    return seuif97.pt(p,t,2)
+
+def pt2cv(p,t):
+    return seuif97.pt(p,t,9)
+
+def pt2a(p,t):
+    return seuif97.pt(p,t,10)
+
+def pt2k(p,t):
+    return seuif97.pt(p,t,11)
+
+def pt2kv(p,t):
+    return seuif97.pt(p,t,25)
+
+# (p, h)
+
+def ph2cp(p,h):
+    return seuif97.ph(p,h,8)
+
+def ph2rho(p,h):
+    return seuif97.ph(p,h,2)
+
+def ph2cv(p,h):
+    return seuif97.ph(p,h,9)
+
+def ph2a(p,h):
+    return seuif97.ph(p,h,10)
+
+def ph2k(p,h):
+    return seuif97.ph(p,h,11)
+
+def ph2kv(p,h):
+    return seuif97.ph(p,h,25)
+
+
+# (p, s)
+def ps2cp(p,s):
+    return seuif97.ps(p,s,8)
+
+def ps2rho(p,s):
+    return seuif97.ps(p,s,2)
+
+def ps2cv(p,s):
+    return seuif97.ps(p,s,9)
+
+def ps2a(p,s):
+    return seuif97.ps(p,s,10)
+
+def ps2k(p,s):
+    return seuif97.ps(p,s,11)
+
+def ps2kv(p,s):
+    return seuif97.ps(p,s,25)
+
+# (p, v)
+def pv2cp(p,v):
+    return seuif97.pv(p,v,8)
+
+def pv2rho(p,v):
+    return seuif97.pv(p,v,2)
+
+def pv2cv(p,v):
+    return seuif97.pv(p,v,9)
+
+def pv2a(p,v):
+    return seuif97.pv(p,v,10)
+
+def pv2k(p,v):
+    return seuif97.pv(p,v,11)
+
+def pv2kv(p,v):
+    return seuif97.pv(p,v,25)
+
+# (p, x)
+def px2cp(p,x):
+    return seuif97.px(p,x,8)
+
+def px2rho(p,x):
+    return seuif97.px(p,x,2)
+
+def px2cv(p,x):
+    return seuif97.px(p,x,9)
+
+def px2a(p,x):
+    return seuif97.px(p,x,10)
+
+def px2k(p,x):
+    return seuif97.px(p,x,11)
+
+def px2kv(p,x):
+    return seuif97.px(p,x,25)
+
+# (t, h)
+def th2cp(t,h):
+    return seuif97.th(t,h,8)
+
+def th2rho(t,h):
+    return seuif97.th(t,h,2)
+
+def th2cv(t,h):
+    return seuif97.th(t,h,9)
+
+def th2a(t,h):
+    return seuif97.th(t,h,10)
+
+def th2k(t,h):
+    return seuif97.th(t,h,11)
+
+def th2kv(t,h):
+    return seuif97.th(t,h,25)
+
+#(t, s)
+def ts2cp(t,s):
+    return seuif97.ts(t,s,8)
+
+def ts2rho(t,s):
+    return seuif97.ts(t,s,2)
+
+def ts2cv(t,s):
+    return seuif97.ts(t,s,9)
+
+def ts2a(t,s):
+    return seuif97.ts(t,s,10)
+
+def ts2k(t,s):
+    return seuif97.ts(t,s,11)
+
+def ts2kv(t,s):
+    return seuif97.ts(t,s,25)
+
+#(t, v)
+def tv2cp(t,v):
+    return seuif97.tv(t,v,8)
+
+def tv2rho(t,v):
+    return seuif97.tv(t,v,2)
+
+def tv2cv(t,v):
+    return seuif97.tv(t,v,9)
+
+def tv2a(t,v):
+    return seuif97.tv(t,v,10)
+
+def tv2k(t,v):
+    return seuif97.tv(t,v,11)
+
+def tv2kv(t,v):
+    return seuif97.tv(t,v,25)
+
+# (t, x)
+def tx2cp(t,x):
+    return seuif97.tx(t,x,8)
+
+def tx2rho(t,x):
+    return seuif97.tx(t,x,2)
+
+def tx2cv(t,x):
+    return seuif97.tx(t,x,9)
+
+def tx2a(t,x):
+    return seuif97.tx(t,x,10)
+
+def tx2k(t,x):
+    return seuif97.tx(t,x,11)
+
+def tx2kv(t,x):
+    return seuif97.tx(t,x,25)
+
+# (h, s)
+def hs2cp(h,s):
+    return seuif97.hs(h,s,8)
+
+def hs2rho(h,s):
+    return seuif97.hs(h,s,2)
+
+def hs2cv(h,s):
+    return seuif97.hs(h,s,9)
+
+def hs2a(h,s):
+    return seuif97.hs(h,s,10)
+
+def hs2k(h,s):
+    return seuif97.hs(h,s,11)
+
+def hs2kv(h,s):
+    return seuif97.hs(h,s,25)

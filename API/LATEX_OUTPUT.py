@@ -1,9 +1,17 @@
 from IPython.display import Latex, display
 import numpy as np
-from TCPv2 import ThPoint
+from . import TCPv2
 from pint import get_application_registry, Quantity
 u = get_application_registry()
 Q = Quantity
+
+
+def make_math_string(input_str:str, **args):
+    for i in args:
+        print(i)
+
+
+
 
 def output_value_var_str(var, value):
     if not((isinstance(value, int))or
@@ -20,7 +28,7 @@ def op_latex_output(data):
     end_str = f'\\end{{dcases}}'
     output_str = ""
     
-    if not(isinstance(data, ThPoint)):
+    if not(isinstance(data, TCPv2.ThPoint)):
         for i in data:
             output_str+=(output_value_var_str(i[0], i[1]))
             output_str+=r" \\ "
@@ -52,24 +60,24 @@ def op_latex_output_2(data):
             ...
         ])
         
-        2. Если входное значение является термодинамической точкой (TCPv2.ThPoint или его
+        2. Если входное значение является термодинамической точкой (TCPv2.TCPv2.ThPoint или его
         последующие версии), то в качестве VARIABLE_NAME используется индекс переменной, связанной
         с термодинамической точкой. В качестве значения на вход подается сама переменная с 
-        разрешением TCPv2.ThPoint, то есть:
+        разрешением TCPv2.TCPv2.ThPoint, то есть:
         
-        Point_1t = TCPv2.ThPoint(p=10, t=550)
+        Point_1t = TCPv2.TCPv2.ThPoint(p=10, t=550)
         op_latex_output_2([
             ("1t", Point_1t),
             ...
         ])
         
         3. Имеется возможность взаимной подачи переменных разных типов (первый случай) вместе с
-        переменными типа TCPv2.ThPoint в одном листе. В этом случае генерация текста будет происходить
+        переменными типа TCPv2.TCPv2.ThPoint в одном листе. В этом случае генерация текста будет происходить
         в порядке перечисления в листе. Переменные термодинамической точки всегда генерируются в 
         одном и том же порядке подряд.
         То есть:
         
-        Point_1t = TCPv2.ThPoint(p=10, t=550)
+        Point_1t = TCPv2.TCPv2.ThPoint(p=10, t=550)
         op_latex_output_2([
             ("1t", Point_1t),
             ("VARIABLE_NAME", value),
@@ -81,19 +89,19 @@ def op_latex_output_2(data):
         4. Имеется возможность вывода массивов 
         
         ADDITIONAL. Так же имеет возможно обозначения полных параметров (полного торможения) для 
-        термодинамических точек (типа TCPv2.ThPoint), для этого необходимо добавить ключевое слово 'FULL'
+        термодинамических точек (типа TCPv2.TCPv2.ThPoint), для этого необходимо добавить ключевое слово 'FULL'
         к индексу, в любое место. Очевидно, что невозможно использовать индекс с значением 'FULL'. 
         Обозначение полных параметров - черта над переменой (индекс не надчеркивается).
         То есть:
         
-        Point_1t = TCPv2.ThPoint(p=10, t=550)
+        Point_1t = TCPv2.TCPv2.ThPoint(p=10, t=550)
         op_latex_output_2([
             ("FULL1t", Point_1t),
             ("FULL 1t", Point_1t),
             ("1tFULL", Point_1t),
             ...
             
-        Для полного погружения необходимо посмотреть функцию TCPv2.ThPoint.dl() и name_by_index_tex: dict.
+        Для полного погружения необходимо посмотреть функцию TCPv2.TCPv2.ThPoint.dl() и name_by_index_tex: dict.
         ])
     '''
 
@@ -137,8 +145,8 @@ def op_latex_output_2(data):
         # Далее алгоритм обрабывает обычные значения и термодинамические точки по-разному
         
         
-        # Если итератор указывает на обычное значение (не ThPoint)
-        if (not(isinstance(i[1], ThPoint))):
+        # Если итератор указывает на обычное значение (не TCPv2.ThPoint)
+        if (not(isinstance(i[1], TCPv2.ThPoint))):
             ORIGIN = 0
             if ((isinstance(i[1], np.ndarray))):
                 if ('ORIGIN' in i[0]):
@@ -179,7 +187,7 @@ def op_latex_output_2(data):
                 # Добавляется перенос строки, аналог '\n' для LaTeX
                     output_str+=r" \\ "
         
-        # Если итератор указывает на значения типа ThPoint
+        # Если итератор указывает на значения типа TCPv2.ThPoint
         else:
             # Переменная, которая будет содержать текст термодинамической точки
             thpoint_str = ""
@@ -199,7 +207,7 @@ def op_latex_output_2(data):
                 thpoint_index = i[0]
                 full_parameter_mode = False
             
-            # С помощью специальной функции из TCPv2.ThPoint получаем лист, состоящий из 
+            # С помощью специальной функции из TCPv2.TCPv2.ThPoint получаем лист, состоящий из 
             # туплов (совокупность двух переменных), аналогичных ("VARIABLE_NAME", value),
             # к примеру:
             # param_container = i[1].dl() = [
@@ -211,7 +219,7 @@ def op_latex_output_2(data):
             # Далее начинаем перебирать данных контейнер для формирования строки параметров
             # термодинамических параметров
             # Не стоит путать этот перебор массива с перебором выше, который перебирал входные данные
-            # Напоминаю, что входные данные могут состоять из нескольких обычных значений и точек типа ThPoint
+            # Напоминаю, что входные данные могут состоять из нескольких обычных значений и точек типа TCPv2.ThPoint
             for j in param_container:
 
                 # Дальнешая работа с переменными делится на два типа, которые в свою очередь еще на два. 
@@ -267,7 +275,7 @@ def display_latex_ex_(data):
 
 def display_latex_ex_2(data):
     display(Latex(op_latex_output_2(data)))
-# A = ThPoint(p=10, t=550)
+# A = TCPv2.ThPoint(p=10, t=550)
 # print(op_latex_output_2(
 #     [
 #         ("FULL1f", A),
@@ -286,7 +294,7 @@ def display_latex_ex_2(data):
 #     ('F', np.array([10,20,30])),
 #     ('D', abc),
 #     ("ddd", Q(10, "Hz")),
-#     ("d1", ThPoint(p=4, t=550))
+#     ("d1", TCPv2.ThPoint(p=4, t=550))
 # ]))
 
 # print(op_latex_output_2([

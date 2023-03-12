@@ -1,24 +1,426 @@
 
 
-import snj_solvers
+from . import snj_solvers
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import matplotlib.ticker as ticker
-
+import pint
 from pint import get_application_registry, Quantity
 un = get_application_registry()
 Q = Quantity
 
+import pandas as pd
 import numpy as np
 
 # Термодинамические свойства воды и водяного пара
-import TCPv2
-from TCPv2 import ThPoint
+from . import TCPv2
+from itertools import product
 
+def HPC_SPLIT_RANGES(                    
+    fp_0,                                   # Давление свежего пара после гидр. сопротивления      |
+    fh_0,                                   # Энтальпия свежего пара                               |
+    n,                                      # Номинальная частота вращения                         |
+    G_0,                                    # Расход пара через группу ступеней                    |
+    p_z,                                    # Давление за группой ступеней                         |
+    etaHPC_oi,                              # Внутренний КПД ЦВД                                   |
+    
+    alpha_1eef_range = Q([9, 20, 1], "deg"),   # Эффективный угол выхода потока из сопловой решетки   |
+    d_1_range = Q([0.6, 1.4, 0.1], "m"),         # Средней диаметр первой ступени                       |
+    rho_k_range = Q([0.03, 0.07, 0.01], ""),       # Степень реактивности в корне первой ступени          |
+    #phi = np.mean([0.93, 0.96]),           # Коэффициент скорости сопловой решетки первой ступени |
+    #mu = np.mean([0.95,0.97]),             # Коэффициент расхода сопловой решетки первой ступени  |
+    #Delta = Q(0.003, "meter"),             # Перекрыша между лопаткиами первой ступени            |
+    #Z = Q(6,""),                           # Предполагаемое число ступеней                        |
+    MODE = "OVERLOAD"                       # Режим расчета ступеней, перегруженный "OVERLOAD"     |                          # или недогруженный "UNDERLOAD"  
+):
+    if (isinstance(d_1_range,pint.Quantity)):
+        d_1_vec_ = np.arange(*(d_1_range.m))
+        #d_1_vec = Q(d_1_vec, "m")
+    else:
+        d_1_vec_ = np.arange(*(d_1_range))
+        #d_1_vec = Q(d_1_vec, "m")
+    if (isinstance(alpha_1eef_range, pint.Quantity)):
+        alpha_1eef_vec_ = np.arange(*(alpha_1eef_range.m))
+        #alpha_1eef_vec = Q(alpha_1eef_vec, "deg")
+    else:
+        alpha_1eef_vec_ = np.arange(*(alpha_1eef_range))
+        #alpha_1eef_vec = Q(alpha_1eef_vec, "deg")
+    
+    if (isinstance(rho_k_range, pint.Quantity)):
+        rho_k_vec_ = np.arange(*(rho_k_range.m))
+        #rho_k_vec = Q(rho_k_vec, "")
+    else:
+        rho_k_vec_ = np.arange(*(rho_k_range))
+        #rho_k_vec = Q(rho_k_vec, "")
+    
+    
+      
+    Z_vec = Q(np.zeros((
+        len(d_1_vec_) *
+        len(alpha_1eef_vec_) *
+        len(rho_k_vec_)
+    )),"")
+    Z_new_vec = Q(np.zeros((
+        len(d_1_vec_) *
+        len(alpha_1eef_vec_) *
+        len(rho_k_vec_)
+    )),"")
+    l_11_vec = Q(np.zeros((
+        len(d_1_vec_) *
+        len(alpha_1eef_vec_) *
+        len(rho_k_vec_)
+    )),"m")
+    d_1_vec = Q(np.zeros((
+        len(d_1_vec_) *
+        len(alpha_1eef_vec_) *
+        len(rho_k_vec_)
+    )),"m")
+    alpha_1eef_vec = Q(np.zeros((
+        len(d_1_vec_) *
+        len(alpha_1eef_vec_) *
+        len(rho_k_vec_)
+    )),"deg")
+    rho_k_vec = Q(np.zeros((
+        len(d_1_vec_) *
+        len(alpha_1eef_vec_) *
+        len(rho_k_vec_)
+    )),"")
+    next_d_vec = Q(np.zeros((
+        len(d_1_vec_) *
+        len(alpha_1eef_vec_) *
+        len(rho_k_vec_)
+    )),"m")
+    isOK_vec = np.zeros((
+        len(d_1_vec_) *
+        len(alpha_1eef_vec_) *
+        len(rho_k_vec_)
+    ))
+    
+    
+    
+    counter = 0
+    for it in product(d_1_vec_,alpha_1eef_vec_,rho_k_vec_):
+        local_split = HPC_SPLIT_2(
+            fp_0                    =fp_0,
+            fh_0                    =fh_0,
+            n                       =n,
+            G_0                     =G_0,
+            p_z                     =p_z,
+            MODE                    =MODE,
+            etaHPC_oi               =etaHPC_oi,
+            d_1                     =Q(it[0],'m'),
+            alpha_1eef              =Q(it[1], 'deg'),
+            rho_k                   =Q(it[2], '')
+        )
+        if (local_split.isOK):
+            Z_vec[counter] = local_split.get_Z()
+            Z_new_vec[counter] = local_split.get_Z_new()
+            l_11_vec[counter] = local_split.get_l_11()
+            next_d_vec[counter] = local_split.get_next_d()
+            
+            d_1_vec[counter] = Q(it[0],'m')
+            alpha_1eef_vec[counter] = Q(it[1], 'deg')
+            rho_k_vec[counter] = Q(it[2], '')
+            
+            isOK_vec[counter] = True
+        else:
+            Z_vec[counter] = Q(-1, '')
+            Z_new_vec[counter] = Q(-1, '')
+            l_11_vec[counter] = Q(-1, 'm')
+            next_d_vec[counter] = Q(-1, 'm')
+            
+            d_1_vec[counter] = Q(it[0],'m')
+            alpha_1eef_vec[counter] = Q(it[1], 'deg')
+            rho_k_vec[counter] = Q(it[2], '')
+            
+            isOK_vec[counter] = False
+        counter += 1
+    
+    data = {
+        'n':np.full(len(d_1_vec), n),
+        'd_1':d_1_vec,
+        'alpha_1eef':alpha_1eef_vec,
+        'rho_k':rho_k_vec,
+        'Z':Z_vec,
+        'Z_new':Z_new_vec,
+        'l_11':l_11_vec,
+        'd_next':next_d_vec,
+        'OK?':isOK_vec
+    }
+    return pd.DataFrame(data)
 
+# columns=['n', 'd_1', 'alpha_1eef', 'rho_k']
+    df = pd.DataFrame(data)
+    
+    return [d_1_vec, alpha_1eef_vec, rho_k_vec, Z_vec, Z_new_vec, l_11_vec, isOK_vec]
+
+class HPC_SPLIT_2:
+    def __init__(
+        self,                       
+        fp_0,                       # Давление свежего пара после гидр. сопротивления      |
+        fh_0,                       # Энтальпия свежего пара                               |
+        n,                          # Номинальная частота вращения                         |
+        G_0,                        # Расход пара через группу ступеней                    |
+        p_z,                        # Давление за группой ступеней                         |
+        alpha_1eef,                 # Эффективный угол выхода потока из сопловой решетки   |
+        etaHPC_oi,                  # Внутренний КПД ЦВД                                   |
+        d_1,                        # Средней диаметр первой ступени                       |
+        rho_k,                      # Степень реактивности в корне первой ступени          |
+        phi = np.mean([0.93, 0.96]),# Коэффициент скорости сопловой решетки первой ступени |
+        mu = np.mean([0.95,0.97]),  # Коэффициент расхода сопловой решетки первой ступени  |
+        Delta = Q(0.003, "meter"),  # Перекрыша между лопаткиами первой ступени            |
+        Z = Q(6,""),                      # Предполагаемое число ступеней                        |
+        MODE = "OVERLOAD"           # Режим расчета ступеней, перегруженный "OVERLOAD"     |
+                                    # или недогруженный "UNDERLOAD"                        |
+    ):
+        self.__fp_0 = fp_0
+        self.__fh_0 = fh_0
+        self.__n    = n
+        self.__G_0  = G_0
+        self.__p_z  = p_z
+        self.__Z    = Z
+        self.__alpha_1eef = alpha_1eef
+        self.__etaHPC_oi = etaHPC_oi
+        self.__d_1 = d_1
+        self.__rho_k = rho_k
+        self.__phi  = phi
+        self.__mu = mu
+        self.__Delta = Delta
+        self.__MODE = MODE
+        
+        # Out values
+        self.__l_11                 = 0
+        self.__d_vec                = None
+        self.__l_vec                = None
+        self.__stages_number_vec    = None
+        self.__theta_vec            = None
+        self.__rho_vec              = None
+        self.__K_vec                = None
+        self.__H_vec                = None
+        self.__H_0ave               = None
+        self.__q_t                  = None
+        self.__Z_new                = None
+        self.__Delta_H              = None
+        self.__H_new_vec            = None
+        self.__next_d               = None
+        
+        # Если в процессе расчета высоты первой лопатки произошло исключение вариант не считается)
+        self.isOK                   = True
+        
+        
+        self.__calculate()
+
+        
+        
+        
+        
+    def __calculate(self):
+        try:
+            # 3.1
+            # ...
+            
+            # 3.2
+            fPoint_0    = TCPv2.ThPoint(p=self.__fp_0, h=self.__fh_0)
+        
+            # 3.3
+            theta = 20
+            iterations_number = 0
+            percent_difference = 0.0
+            
+            while (True):
+    
+                # 3.2. Определяем степень реактивности на среднем диаметре
+                rho = self.__rho_k + 1.8/(theta+1.8)
+    
+                # 3.3. Определяем оптимальное значение u/c_f
+                uDIVu_cf = self.__phi*np.cos(self.__alpha_1eef)/(2*np.sqrt(1-rho))
+    
+                # 3.4. Определяем располагаемый теплопеперад по параметрам торможения при оптимальном
+                # u/c_f для первой ступени 
+                fH_01 = 12300 * np.power((self.__d_1 * self.__n)/(uDIVu_cf * 50), 2)
+                fH_01.ito('kJ/kg')
+    
+                # 3.5. Определяем теоретическое значение энтальпии за первой ступенью
+                h_2t = self.__fh_0 - fH_01
+    
+                # 3.6. Определяем удальный объем пара за первой нерегулируемой ступенью при
+                # изоэнтропном процессе расширения по свойствам воды и водяного пара
+                Point_2t = TCPv2.ThPoint(h=h_2t, s=fPoint_0.s())
+                v_2t = Point_2t.v()
+    
+                # 3.7. Определеяем высоту первой нерегулируемой ступени
+                self.__l_11 = (self.__G_0 * v_2t * uDIVu_cf)/(np.power(np.pi*self.__d_1,2) * self.__n * np.sqrt(1-rho) * np.sin(self.__alpha_1eef) * self.__mu)
+                
+                # 3.8. Определяем окончательное значение обратной веерности и проверяем его
+    
+                # Проверка условия 
+                # Если получившаяся величина больше, чем заданная
+                if (self.__d_1/self.__l_11 > theta):
+                    # То вычитаем отношение из единицы
+                    percent_difference = (1 - theta/(self.__d_1/self.__l_11)) 
+                # Если величина меньше, чем заданная
+                else:
+                    # То вычитаем из отношения единицу
+                    percent_difference = (theta/(self.__d_1/self.__l_11) - 1)
+    
+                # Если условие выполнилось - выходим из цикла
+                if (np.abs(percent_difference) < 0.01):
+                    break
+                # Иначе добавляем итерацию и меняем приближающее значение на найденное в процессе цикла
+                else:
+                    iterations_number += 1
+                    theta = (self.__d_1/self.__l_11)
+            
+            self.__l_11.ito("m")   
+            
+            # 4.
+            # Высота рабочей лопатки
+            l_21 = self.__l_11 + self.__Delta
+            l_21.ito('m')
+            
+            # 5.
+            # Корневой диаметр ступени
+            d_k = self.__d_1 - l_21
+            d_k.ito('m')
+            
+            # 6.1. Значение энтальпии пара при изоэнтропном расширении пара в ЦВД:
+            # Термодинамическая точка zt
+            Point_zt = TCPv2.ThPoint(p=self.__p_z, s=fPoint_0.s())
+            # Энтальпия
+            h_zt = Point_zt.h()
+
+            # 6.2. Теоретический перепад на отсек нерегулируемых ступеней ЦВД:
+            fH_0 = self.__fh_0 - h_zt
+
+            # 6.3. Действительный теплоперепад на отсек нерегулируемых ступеней ЦВД
+            H_i = fH_0 * self.__etaHPC_oi
+
+            # 6.4. Действительное значение энтальпии за ЦВД (за последней ступенью)
+            h_z = self.__fh_0 - H_i
+
+            # 6.5 Действительный объем за ЦВД (за последней ступенью)
+            # Термодинамическая точка 2z
+            Point_2z = TCPv2.ThPoint(p=self.__p_z, h=h_z)
+            v_2z = Point_2z.v()
+            
+            # 7 Высота рабочей лопатки последней ступени
+            l_2z = (-d_k + np.sqrt(d_k**2 + 4*l_21*self.__d_1*v_2z/v_2t))/2
+            
+            # 8 Средний диаметр последней ступени группы
+            d_2z = d_k + l_2z
+            
+            # 9.1 Обратная вверность в первой и последней ступени
+            theta_1 = (l_21 + d_k)/l_21
+            theta_z = (l_2z + d_k)/l_2z
+            # 9.2 Степень реактивности в первой и последней ступени
+            rho_1 = self.__rho_k + 1.8/(theta_1 + 1.8)
+            rho_z = self.__rho_k + 1.8/(theta_z + 1.8)
+            # 9.3 Оптимальное значение u/c_ф
+            uDIVu_1 = self.__phi*np.cos(self.__alpha_1eef)/(2*np.sqrt(1-rho_1))
+            uDIVu_z = self.__phi*np.cos(self.__alpha_1eef)/(2*np.sqrt(1-rho_z))
+            
+            ## 10.1.1, 10.1.2
+            # Коэффициент k для функции диаметра
+            k_d = (d_2z - self.__d_1)/(self.__Z.m-1)
+            b_d = (self.__d_1*self.__Z.m - d_2z)/(self.__Z.m-1)
+
+            # Коэффициент k для функции длины лопатки
+            k_l = (l_2z - l_21)/(self.__Z.m-1)
+            b_l = (l_21*self.__Z.m - l_2z)/(self.__Z.m-1)
+
+            # Функция для определения диаметра по номеру ступени
+            def d(z_i):
+                return k_d*z_i + b_d
+
+            # Функция для определения длины лопатки по номеру ступени
+            def l(z_i):
+                return k_l*z_i + b_l
+
+            # Перечислим номера ступеней в данном векторе
+            self.__stages_number_vec = np.arange(1, self.__Z.m+1, 1)
+
+            # Диаметры каждой ступени
+            self.__d_vec = d(self.__stages_number_vec)
+
+            # Длины сопловых лопаток каждой ступени
+            self.__l_vec = l(self.__stages_number_vec)
+            
+            # 10.2
+            # Обратная вверность для каждой ступени
+            self.__theta_vec = (self.__l_vec + d_k)/self.__l_vec
+
+            # 10.3
+            # Степень реактивности на среднем диаметре для каждой ступени
+            self.__rho_vec = self.__rho_k + 1.8/(self.__theta_vec + 1.8)
+            
+            # 10.4. Для каждой ступени определяем величину u/c_f
+            uDIVc_f_vec = self.__phi*np.cos(self.__alpha_1eef)/(2*np.sqrt(1-self.__rho_vec))
+
+            # 10.5 Теплоперепад по статическим параметрам для каждой ступени
+            # Вектор коэффициентов K_i
+            self.__K_vec = np.full(self.__Z.m, 0.95)
+            self.__K_vec[0] = 1.0
+
+            self.__H_vec = 12300 * (self.__d_vec/uDIVc_f_vec)**2 * (self.__n/50)**2 * self.__K_vec
+            self.__H_vec.ito('kJ/kg')
+            
+            # 10.6 Среднее значение теплоперепада за группу ступеней
+            self.__H_0ave = np.mean(self.__H_vec)
+            
+            # 10.7 Коэффициент возврата теплоты
+            q_t_k = Q(4.8*10**(-4), 'kg/kJ')
+            self.__q_t = q_t_k * (1 - self.__etaHPC_oi)*self.__H_0ave * (self.__Z.m-1)/self.__Z.m
+            
+            # 10.8 Уточненное количество ступеней группы
+            self.__Z_new = fH_0/self.__H_0ave * (1+self.__q_t)
+            self.__Z_new.ito('')
+
+            # 11 Величина распределения теплоперепадов дробной ступени на остальные
+            self.__Delta_H = (fH_0*(1+self.__q_t)/self.__Z.m) - self.__H_0ave
+            
+            # 12 Уточненные теплоперепады
+            self.__H_new_vec = self.__H_vec + self.__Delta_H
+            
+            # Диаметр первой ступени следующего цилиндра
+            self.__next_d = self.__d_vec[len(self.__d_vec)-1] + (self.__d_vec[1]-self.__d_vec[0])
+            
+            # Для автоматическогов выбора ступеней
+            if ((self.__MODE == "OVERLOAD")and not(abs(int(self.__Z_new.m) - self.__Z.m) < 1)):
+                self.__Z = Q(int(self.__Z_new), "")
+                self.__calculate()
+            #elif (((self.__MODE == "OVERLOAD")and (int(self.__Z_new.m) == self.__Z.m + 1))):
+                #pass# not(int(self.__Z_new.m)+1 == self.__Z.m)
+            if ((self.__MODE == "UNDERLOAD")and not(int(self.__Z_new.m) - self.__Z.m > 1)):
+                self.__Z = Q(int(self.__Z_new) + 1, "")
+                self.__calculate()
+            #else:
+                #pass
+                
+            
+        except Exception as s:
+            self.isOK = False
+            #print(s)
+    
+    # getters
+    def get_next_d(self):               return self.__next_d
+    def get_Z(self):                    return self.__Z
+    def get_l_11(self):                 return self.__l_11
+    def get_d_vec(self):                return self.__d_vec
+    def get_l_vec(self):                return self.__l_vec
+    def get_stages_number_vec(self):    return self.__stages_number_vec
+    def get_theta_vec(self):            return self.__theta_vec
+    def get_rho_vec(self):              return self.__rho_vec
+    def get_K_vec(self):                return self.__K_vec
+    def get_H_vec(self):                return self.__H_vec
+    def get_H_0ave(self):               return self.__H_0ave
+    def get_q_t(self):                  return self.__q_t          
+    def get_Z_new(self):                return self.__Z_new          
+    def get_Delta_H(self):              return self.__Delta_H       
+    def get_H_new_vec(self):            return self.__H_new_vec      
+    
 class HPC_SPLIT:
     def __init__(
-        self,                      # Давление свежего пара                                |
+        self,                       # Давление свежего пара                                |
         fp_0,                       # Давление свежего пара после гидр. сопротивления      |
         fh_0,                       # Температура свежего пара                             |
         n,                          # Номинальная частота вращения                         |
@@ -39,36 +441,36 @@ class HPC_SPLIT:
         
         # Входные величины ---------
         #self.fp_0_      = fp_0_
-        self.fp_0       = fp_0
-        self.fh_0       = fh_0
-        self.n          = n
-        self.G_0        = G_0
-        self.p_z        = p_z
-        self.Z          = Z
-        self.alpha_1eef = alpha_1eef
-        self.d_1        = d_1
-        self.rho_k      = rho_k
-        self.phi        = phi
-        self.mu         = mu
-        self.Delta      = Delta
-        self.etaHPC_oi  = etaHPC_oi
+        self.__fp_0       = fp_0
+        self.__fh_0       = fh_0
+        self.__n          = n
+        self.__G_0        = G_0
+        self.__p_z        = p_z
+        self.__Z          = Z
+        self.__alpha_1eef = alpha_1eef
+        self.__d_1        = d_1
+        self.__rho_k      = rho_k
+        self.__phi        = phi
+        self.__mu         = mu
+        self.__Delta      = Delta
+        self.__etaHPC_oi  = etaHPC_oi
         
         # Переменные необходимые в процессе вычисления
         # 2
-        self.fPoint_0_              = None
-        self.fPoint_0               = None
-        self.fs_0                   = None
+        self.__fPoint_0_              = None
+        self.__fPoint_0               = None
+        self.__fs_0                   = None
         
         
         # 3
-        self.theta                  = None
-        self.iteration_number       = None
-        self.percent_difference     = None
-        self.l_11                   = None
-        self.uDIVu_cf               = None
-        self.fH_01                  = None
-        self.h_2t                   = None
-        self.v_2t                   = None
+        self.__theta                  = None
+        self.__iteration_number       = None
+        self.__percent_difference     = None
+        self.__l_11                   = None
+        self.__uDIVu_cf               = None
+        self.__fH_01                  = None
+        self.__h_2t                   = None
+        self.  v_2t                   = None
         
         # 4
         self.l_21                   = None
@@ -190,7 +592,7 @@ class HPC_SPLIT:
     
             # 3.6. Определяем удальный объем пара за первой нерегулируемой ступенью при
             # изоэнтропном процессе расширения по свойствам воды и водяного пара
-            Point_2t = ThPoint(h=h_2t, s=self.fs_0)
+            Point_2t = TCPv2.ThPoint(h=h_2t, s=self.fs_0)
             v_2t = Point_2t.v()
     
             # 3.7. Определеяем высоту первой нерегулируемой ступени
@@ -241,7 +643,7 @@ class HPC_SPLIT:
     def update_steam_parameters_after_last_stage(self):
         # 6.1. Значение энтальпии пара при изоэнтропном расширении пара в ЦВД:
         # Термодинамическая точка zt
-        self.Point_zt = ThPoint(p=self.p_z, s=self.fs_0)
+        self.Point_zt = TCPv2.ThPoint(p=self.p_z, s=self.fs_0)
         # Энтальпия
         self.h_zt = self.Point_zt.h()
 
@@ -256,7 +658,7 @@ class HPC_SPLIT:
 
         # 6.5 Действительный объем за ЦВД (за последней ступенью)
         # Термодинамическая точка 2z
-        self.Point_2z = ThPoint(p=self.p_z, h=self.h_z)
+        self.Point_2z = TCPv2.ThPoint(p=self.p_z, h=self.h_z)
         self.v_2z = self.Point_2z.v()
     
     # 7. Определяем высоту рабочей лопатки последней ступени исходя из
@@ -450,9 +852,14 @@ def get_auto_number_of_stages_split(
         if not(it_split.isOK):
             return it_split
         
-        if (np.abs(it_split.Z_new-local_z) > 1): 
-            local_z = int(it_split.Z_new.m)
-        else:
+        #if (it_split.Z_new - local_z < 0):
+        #    local_z += 1
+        #else:
+        #    local_z -= 1
+        return it_split
+        if not(np.abs(it_split.Z_new-local_z) > 1): 
+            #local_z = int(it_split.Z_new.m)
+        #else:
             return it_split
 
 # Входные параметры, которые можно варировать
@@ -866,7 +1273,22 @@ def generate_table_of_split_data_in_tex(d_1, rho_k_vec, alpha_1eef_vec, Z_vec, l
         main_data_string+=('\t' + data_row_str + '\n')
     main_data_string+=(r"\end{tabular}" + "\n")
     return main_data_string
-#
+
+# fff = HPC_SPLIT(
+#     d_1 = Q(0.6,'m'),        
+#     rho_k=Q(0.05, ""),
+#     alpha_1eef_range=Q(9, 'deg'),       
+#     fp_0        = Q(8.73, "MPa"),
+#     fh_0        = Q(3563.4, "kJ/kg"),
+#     n           = Q(95, "1/s"),
+#     G_0         = Q(38.88, "kg/s"),
+#     p_z         = Q(1.8, "MPa"),
+#     etaHPC_oi   = 0.846,
+#     mu = Q(0.98, ''),
+#     phi = Q(0.98, ''),
+#     Z = 5
+# )
+
 # ddd = calculate_hpc_split_in_ranges(
 #         d_1 = Q(0.6, "meter"),        
 #         rho_k_range=(0.03,0.10, 0.01),      
