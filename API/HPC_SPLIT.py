@@ -17,21 +17,22 @@ from . import TCPv2
 from itertools import product
 
 def HPC_SPLIT_RANGES(                    
-    fp_0,                                   # Давление свежего пара после гидр. сопротивления      |
-    fh_0,                                   # Энтальпия свежего пара                               |
-    n,                                      # Номинальная частота вращения                         |
-    G_0,                                    # Расход пара через группу ступеней                    |
-    p_z,                                    # Давление за группой ступеней                         |
-    etaHPC_oi,                              # Внутренний КПД ЦВД                                   |
-    
-    alpha_1eef_range = Q([9, 20, 1], "deg"),   # Эффективный угол выхода потока из сопловой решетки   |
-    d_1_range = Q([0.6, 1.4, 0.1], "m"),         # Средней диаметр первой ступени                       |
-    rho_k_range = Q([0.03, 0.07, 0.01], ""),       # Степень реактивности в корне первой ступени          |
+    fp_0,                                       # Давление свежего пара после гидр. сопротивления      |
+    fh_0,                                       # Энтальпия свежего пара                               |
+    n,                                          # Номинальная частота вращения                         |
+    G_0,                                        # Расход пара через группу ступеней                    |
+    p_z,                                        # Давление за группой ступеней                         |
+    etaHPC_oi,                                  # Внутренний КПД ЦВД                                   |
+    ID,
+    alpha_1eef_range = Q([9, 20, 1], "deg"),    # Эффективный угол выхода потока из сопловой решетки   |
+    d_1_range = Q([0.6, 1.4, 0.1], "m"),        # Средней диаметр первой ступени                       |
+    rho_k_range = Q([0.03, 0.07, 0.01], ""),    # Степень реактивности в корне первой ступени          |
     #phi = np.mean([0.93, 0.96]),           # Коэффициент скорости сопловой решетки первой ступени |
     #mu = np.mean([0.95,0.97]),             # Коэффициент расхода сопловой решетки первой ступени  |
     #Delta = Q(0.003, "meter"),             # Перекрыша между лопаткиами первой ступени            |
     #Z = Q(6,""),                           # Предполагаемое число ступеней                        |
-    MODE = "OVERLOAD"                       # Режим расчета ступеней, перегруженный "OVERLOAD"     |                          # или недогруженный "UNDERLOAD"  
+    MODE = "OVERLOAD",                       # Режим расчета ступеней, перегруженный "OVERLOAD"     |
+    isSectionFirst = False# или недогруженный "UNDERLOAD"  
 ):
     if (isinstance(d_1_range,pint.Quantity)):
         d_1_vec_ = np.arange(*(d_1_range.m))
@@ -52,54 +53,22 @@ def HPC_SPLIT_RANGES(
     else:
         rho_k_vec_ = np.arange(*(rho_k_range))
         #rho_k_vec = Q(rho_k_vec, "")
+        
+    vec_len = len(d_1_vec_) * len(alpha_1eef_vec_) * len(rho_k_vec_)
+    
+    Z_vec           = np.zeros((vec_len))#Q(np.zeros(( vec_len)),"")
+    Z_new_vec       = np.zeros((vec_len))#Q(np.zeros((vec_len)),"")
+    l_11_vec        = np.zeros((vec_len))#Q(np.zeros((vec_len)),"m")
+    d_1_vec         = np.zeros((vec_len))#Q(np.zeros((vec_len)),"m")
+    alpha_1eef_vec  = np.zeros((vec_len))#Q(np.zeros((vec_len)),"deg")
+    rho_k_vec       = np.zeros((vec_len))#Q(np.zeros((vec_len)),"")
+    next_d_vec      = np.zeros((vec_len))#Q(np.zeros((vec_len)),"m")
+    q_t_vec         = np.zeros((vec_len))#Q(np.zeros((vec_len)),'')
+    Delta_H_vec     = np.zeros((vec_len))#Q(np.zeros((vec_len)),'kJ/kg')
+    isOK_vec        = np.zeros((vec_len))
     
     
-      
-    Z_vec = Q(np.zeros((
-        len(d_1_vec_) *
-        len(alpha_1eef_vec_) *
-        len(rho_k_vec_)
-    )),"")
-    Z_new_vec = Q(np.zeros((
-        len(d_1_vec_) *
-        len(alpha_1eef_vec_) *
-        len(rho_k_vec_)
-    )),"")
-    l_11_vec = Q(np.zeros((
-        len(d_1_vec_) *
-        len(alpha_1eef_vec_) *
-        len(rho_k_vec_)
-    )),"m")
-    d_1_vec = Q(np.zeros((
-        len(d_1_vec_) *
-        len(alpha_1eef_vec_) *
-        len(rho_k_vec_)
-    )),"m")
-    alpha_1eef_vec = Q(np.zeros((
-        len(d_1_vec_) *
-        len(alpha_1eef_vec_) *
-        len(rho_k_vec_)
-    )),"deg")
-    rho_k_vec = Q(np.zeros((
-        len(d_1_vec_) *
-        len(alpha_1eef_vec_) *
-        len(rho_k_vec_)
-    )),"")
-    next_d_vec = Q(np.zeros((
-        len(d_1_vec_) *
-        len(alpha_1eef_vec_) *
-        len(rho_k_vec_)
-    )),"m")
-    isOK_vec = np.zeros((
-        len(d_1_vec_) *
-        len(alpha_1eef_vec_) *
-        len(rho_k_vec_)
-    ))
-    
-    
-    
-    counter = 0
-    for it in product(d_1_vec_,alpha_1eef_vec_,rho_k_vec_):
+    for i,it in enumerate(product(d_1_vec_,alpha_1eef_vec_,rho_k_vec_)):
         local_split = HPC_SPLIT_2(
             fp_0                    =fp_0,
             fh_0                    =fh_0,
@@ -110,49 +79,53 @@ def HPC_SPLIT_RANGES(
             etaHPC_oi               =etaHPC_oi,
             d_1                     =Q(it[0],'m'),
             alpha_1eef              =Q(it[1], 'deg'),
-            rho_k                   =Q(it[2], '')
+            rho_k                   =Q(it[2], ''),
+            isSectionFirst=isSectionFirst
         )
         if (local_split.isOK):
-            Z_vec[counter] = local_split.get_Z()
-            Z_new_vec[counter] = local_split.get_Z_new()
-            l_11_vec[counter] = local_split.get_l_11()
-            next_d_vec[counter] = local_split.get_next_d()
+            Z_vec[i]            = local_split.get_Z().m
+            Z_new_vec[i]        = local_split.get_Z_new().m
+            l_11_vec[i]         = local_split.get_l_11().m
+            next_d_vec[i]       = local_split.get_next_d().m
+            q_t_vec[i]          = local_split.get_q_t().m
+            Delta_H_vec[i]      = local_split.get_Delta_H().m
             
-            d_1_vec[counter] = Q(it[0],'m')
-            alpha_1eef_vec[counter] = Q(it[1], 'deg')
-            rho_k_vec[counter] = Q(it[2], '')
-            
-            isOK_vec[counter] = True
+            isOK_vec[i] = True
         else:
-            Z_vec[counter] = Q(-1, '')
-            Z_new_vec[counter] = Q(-1, '')
-            l_11_vec[counter] = Q(-1, 'm')
-            next_d_vec[counter] = Q(-1, 'm')
+            Z_vec[i]            = local_split.get_Z()#Q(-1, '')
+            Z_new_vec[i]        = 0#Q(-1, '')
+            l_11_vec[i]         = 0#Q(-1, 'm')
+            next_d_vec[i]       = 0#Q(-1, 'm')
+            q_t_vec[i]          = 0#Q(-1, '')
+            Delta_H_vec[i]      = 0#Q(None, 'kJ/kg')
             
-            d_1_vec[counter] = Q(it[0],'m')
-            alpha_1eef_vec[counter] = Q(it[1], 'deg')
-            rho_k_vec[counter] = Q(it[2], '')
-            
-            isOK_vec[counter] = False
-        counter += 1
+            isOK_vec[i] = False
+        
+        d_1_vec[i]          = it[0]#Q(it[0],'m')
+        alpha_1eef_vec[i]   = it[1]#Q(it[1], 'deg')
+        rho_k_vec[i]        = it[2]#Q(it[2], '')
     
     data = {
-        'n':np.full(len(d_1_vec), n),
+        'n':np.full(vec_len, n),
         'd_1':d_1_vec,
         'alpha_1eef':alpha_1eef_vec,
         'rho_k':rho_k_vec,
         'Z':Z_vec,
         'Z_new':Z_new_vec,
+        'Z_ratio':(Z_new_vec/Z_vec),
+        'q_t':q_t_vec,
+        'Delta_H':Delta_H_vec,
         'l_11':l_11_vec,
         'd_next':next_d_vec,
-        'OK?':isOK_vec
+        'ID':np.full(vec_len, ID),
+        'isOK':isOK_vec
     }
     return pd.DataFrame(data)
 
-# columns=['n', 'd_1', 'alpha_1eef', 'rho_k']
-    df = pd.DataFrame(data)
+    # columns=['n', 'd_1', 'alpha_1eef', 'rho_k']
+    # df = pd.DataFrame(data)
     
-    return [d_1_vec, alpha_1eef_vec, rho_k_vec, Z_vec, Z_new_vec, l_11_vec, isOK_vec]
+    # return [d_1_vec, alpha_1eef_vec, rho_k_vec, Z_vec, Z_new_vec, l_11_vec, isOK_vec]
 
 class HPC_SPLIT_2:
     def __init__(
@@ -169,9 +142,12 @@ class HPC_SPLIT_2:
         phi = np.mean([0.93, 0.96]),# Коэффициент скорости сопловой решетки первой ступени |
         mu = np.mean([0.95,0.97]),  # Коэффициент расхода сопловой решетки первой ступени  |
         Delta = Q(0.003, "meter"),  # Перекрыша между лопаткиами первой ступени            |
-        Z = Q(6,""),                      # Предполагаемое число ступеней                        |
-        MODE = "OVERLOAD"           # Режим расчета ступеней, перегруженный "OVERLOAD"     |
+        Z = Q(6,""),                # Преsдполагаемое число ступеней                       |
+        MODE = "OVERLOAD",          # Режим расчета ступеней, перегруженный "OVERLOAD"     |
                                     # или недогруженный "UNDERLOAD"                        |
+                                    #                                                      |
+        isSectionFirst = False      # Если 0, то K=[1,0.95], Если 1, то K=[0,95...]        |
+        
     ):
         self.__fp_0 = fp_0
         self.__fh_0 = fh_0
@@ -187,6 +163,7 @@ class HPC_SPLIT_2:
         self.__mu = mu
         self.__Delta = Delta
         self.__MODE = MODE
+        self.__isSectionFirst = isSectionFirst
         
         # Out values
         self.__l_11                 = 0
@@ -358,9 +335,12 @@ class HPC_SPLIT_2:
 
             # 10.5 Теплоперепад по статическим параметрам для каждой ступени
             # Вектор коэффициентов K_i
+            # k
+            
             self.__K_vec = np.full(self.__Z.m, 0.95)
-            self.__K_vec[0] = 1.0
-
+            
+            if (self.__isSectionFirst): self.__K_vec[0] = 1.0
+                
             self.__H_vec = 12300 * (self.__d_vec/uDIVc_f_vec)**2 * (self.__n/50)**2 * self.__K_vec
             self.__H_vec.ito('kJ/kg')
             
@@ -402,6 +382,8 @@ class HPC_SPLIT_2:
             #print(s)
     
     # getters
+    def get_q_t(self):                  return self.__q_t
+    def get_Delta(self):                return self.__Delta_H
     def get_next_d(self):               return self.__next_d
     def get_Z(self):                    return self.__Z
     def get_l_11(self):                 return self.__l_11
