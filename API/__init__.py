@@ -6,6 +6,7 @@ from .HPC_SPLIT import *
 from .LATEX_OUTPUT import *
 
 from .HPC_SPLIT import *
+from .Stage import *
 
 #make_math_string("3123", a=10, b=30)
 
