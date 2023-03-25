@@ -9,47 +9,49 @@ import pandas as pd
 
 import time
 
-GridProfile("С-90-12А")
+#aaa = GridProfile(M=0.414,type=1,in_angle=27.591,out_angle=17.611)
 
-df = pd.DataFrame(columns=[
-    'Name',
-    'b',
-    'B',
-    'a',
-    'rel_t',
-    'ins_angle',
-    'Delta_in',
-    'Delta_out',
-    'center_X',
-    'center_Y',
-    'F',
-    'Ixx',
-    'Iyy',
-    'Wxx_back',
-    'Wxx_edge',
-    'Wyy_in_edge',
-    'Wyy_out_edge'
-])
+# print(int(301.111))
+#print(aaa.get_grids_list())
+# df = pd.DataFrame(columns=[
+#     'Name',
+#     'b',
+#     'B',
+#     'a',
+#     'rel_t',
+#     'ins_angle',
+#     'Delta_in',
+#     'Delta_out',
+#     'center_X',
+#     'center_Y',
+#     'F',
+#     'Ixx',
+#     'Iyy',
+#     'Wxx_back',
+#     'Wxx_edge',
+#     'Wyy_in_edge',
+#     'Wyy_out_edge'
+# ])
 
-df = df.append({
-    'Name':'C-04-19',
-    'b':1,
-    'B':1,
-    'a':1,
-    'rel_t':1,
-    'ins_angle':1,
-    'Delta_in':1,
-    'Delta_out':1,
-    'center_X':1,
-    'center_Y':1,
-    'F':1,
-    'Ixx':1,
-    'Iyy':1,
-    'Wxx_back':1,
-    'Wxx_edge':1,
-    'Wyy_in_edge':1,
-    'Wyy_out_edge':1
-},ignore_index=True)
+# df = df.append({
+#     'Name':'C-04-19',
+#     'b':1,
+#     'B':1,
+#     'a':1,
+#     'rel_t':1,
+#     'ins_angle':1,
+#     'Delta_in':1,
+#     'Delta_out':1,
+#     'center_X':1,
+#     'center_Y':1,
+#     'F':1,
+#     'Ixx':1,
+#     'Iyy':1,
+#     'Wxx_back':1,
+#     'Wxx_edge':1,
+#     'Wyy_in_edge':1,
+#     'Wyy_out_edge':1
+# },ignore_index=True)
 
 #df.to_csv('aue.csv')
 
@@ -104,6 +106,22 @@ df = df.append({
 #     kappa_vs = 0.5,
 #     )
 
+fu = Stage(
+    p_0=10.50,
+    t_0=439.2,
+    G_0=639,
+    d_hub = 0.5,
+    n = 50,
+    reaction=0.235,
+    alpha_0 = 90,
+    alpha_1eef=14,
+    H_0=38.33 - np.power(57, 2)/2000,
+    c_0 = 57,
+    Delta_pr=0.004,
+    kappa_vs=1
+)
+
+pprint(fu.get_results())
 # ff = Stage(
 #     p_0=8.73,
 #     t_0=570,
