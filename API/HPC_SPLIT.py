@@ -16,6 +16,64 @@ import numpy as np
 from . import TCPv2
 from itertools import product
 
+from threading import Thread
+
+# def generate_tex_hpc(
+    
+# ):
+
+
+
+GLOBAL_DF = pd.DataFrame(columns=[
+        'n', 
+        'rho_k', 
+                                   
+        'd_1_1', 
+        'd_next_1', 
+        'alpha_1eef_1',
+        'Z_1',
+        'Z_new_1',
+        'Z_ratio_1',
+        'q_t_1',
+        'Delta_H_1',
+        'H_ave_1',
+        'l_11_1',
+        'd_k_1',
+        'theta_1',
+        
+        
+        'd_1_2', 
+        'd_next_2', 
+        'alpha_1eef_2',
+        'Z_2',
+        'Z_new_2',
+        'Z_ratio_2',
+        'q_t_2',
+        'Delta_H_2',
+        'H_ave_2',
+        'l_11_2',
+        'd_k_2',
+        'theta_2',
+        
+        'd_1_3',
+        'd_next_3', 
+        'alpha_1eef_3',
+        'Z_3',
+        'Z_new_3',
+        'Z_ratio_3',
+        'q_t_3',
+        'Delta_H_3',
+        'H_ave_3',
+        'l_11_3',
+        'd_k_3',
+        'theta_3'
+        ])
+
+def get_GLOBAL_DF():
+    return GLOBAL_DF
+def set_GLOBAL_DF(data):
+    GLOBAL_DF = pd.concat([data])
+
 class HPC_SPLIT_SETUP:
     def __init__(
         self,                       
@@ -58,8 +116,194 @@ class HPC_SPLIT_SETUP:
         self.FAST_MODE = FAST_MODE
         self.ID = ID
 
+def local_calculate_split(setup_1, setup_2, setup_3, d_1_vec_1_,d_1_range_3, alpha_1eef_vec_, rho_k_vec_):
+    global GLOBAL_DF
+    
+    class split_parameters_array_list:
+        def __init__(self, size):
+            self.rho_k = np.zeros(size)    
+            self.d_1 = np.zeros(size)
+            self.d_next = np.zeros(size)
+            self.alpha_1eef = np.zeros(size)
+            self.Z = np.zeros(size)
+            self.Z_new = np.zeros(size)
+            self.Z_ratio = np.zeros(size)
+            self.q_t = np.zeros(size)
+            self.Delta_H = np.zeros(size)
+            self.H_ave = np.zeros(size)
+            self.l_11 = np.zeros(size)
+            self.d_k = np.zeros(size)
+            self.theta = np.zeros(size)
+        
+        def set_row(self, i, rho_k, d_1, d_next, alpha_1eef, Z, Z_new, q_t, Delta_H, H_ave, l_11, d_k, theta):
+            self.rho_k[i] = rho_k
+            self.d_1[i] = d_1
+            self.d_next[i] = d_next 
+            self.alpha_1eef[i] = alpha_1eef
+            self.Z[i] = Z
+            self.Z_new[i] = Z_new
+            self.q_t[i] = q_t
+            self.Delta_H[i] = Delta_H
+            self.H_ave[i] = H_ave
+            self.l_11[i] = l_11 
+            self.d_k[i] = d_k
+            self.theta[i] = theta  
+    
+    
+    
+    for index, thing in enumerate(product(d_1_vec_1_,alpha_1eef_vec_,rho_k_vec_)):     #4
+        setup_1_            = setup_1
+        setup_1_.d_1        = Q(thing[0], 'm')
+        setup_1_.alpha_1eef = Q(thing[1], 'deg')
+        setup_1_.rho_k      = Q(thing[2], '')
+        
+        SPLIT_1 = HPC_SPLIT_2(setup=setup_1_)
+        
+        if (SPLIT_1.isOK()):
+            for thing_ in alpha_1eef_vec_:
+                setup_2_            = setup_2
+                setup_2_.d_1        = Q(round(SPLIT_1.get_next_d(),3), 'm')
+                setup_2_.alpha_1eef = Q(thing_, 'deg')
+                setup_2_.rho_k      = Q(thing[2], '')
+            
+                SPLIT_2 = HPC_SPLIT_2(setup=setup_2_)
+                
+                if (SPLIT_2.isOK()): 
+                    if (SPLIT_2.get_d_k() >= SPLIT_1.get_d_k()):
+                        for thing__ in product(
+                            alpha_1eef_vec_, 
+                            np.arange(round(SPLIT_2.get_next_d(), 2),d_1_range_3[1].m,d_1_range_3[2].m)
+                            ):
+                            setup_3_            = setup_3
+                            setup_3_.d_1        = Q(thing__[1], 'm') # round(SPLIT_2.get_next_d(),3) + 0
+                            setup_3_.alpha_1eef = Q(thing__[0], 'deg')
+                            setup_3_.rho_k      = Q(thing[2], '')
+                
+                            SPLIT_3 = HPC_SPLIT_2(setup=setup_3_)
+                
+                            if (SPLIT_3.isOK()):
+                                if (SPLIT_3.get_d_k() >= SPLIT_2.get_d_k()):
+                                    print('DONE')
+                                    GLOBAL_DF = pd.concat([GLOBAL_DF, 
+                                                           pd.DataFrame.from_dict(
+                                    {
+                                    'n':            setup_1_.n.m, 
+                                    'rho_k':        setup_1_.rho_k.m, 
+                                   
+                                    'd_1_1':        SPLIT_1.get_d_1(),
+                                    'd_next_1':     SPLIT_1.get_next_d(),
+                                    'alpha_1eef_1': setup_1_.alpha_1eef.m,
+                                    'Z_1':          SPLIT_1.get_Z(),
+                                    'Z_new_1':      SPLIT_1.get_Z_new(),
+                                    'Z_ratio_1':    SPLIT_1.get_Z_new()/SPLIT_1.get_Z(),
+                                    'q_t_1':        SPLIT_1.get_q_t(),
+                                    'Delta_H_1':    SPLIT_1.get_Delta_H(),
+                                    'H_ave_1':      SPLIT_1.get_H_0ave(),
+                                    'l_11_1':       SPLIT_1.get_l_11(),
+                                    'd_k_1':        SPLIT_1.get_d_k(),
+                                    'theta_1':      SPLIT_1.get_last_theta(),
+                                    
+                                    'd_1_2':        SPLIT_2.get_d_1(), 
+                                    'd_next_2':     SPLIT_2.get_next_d(),
+                                    'alpha_1eef_2': setup_2_.alpha_1eef.m,
+                                    'Z_2':          SPLIT_2.get_Z(),
+                                    'Z_new_2':      SPLIT_2.get_Z_new(),
+                                    'Z_ratio_2':    SPLIT_2.get_Z_new()/SPLIT_2.get_Z(),
+                                    'q_t_2':        SPLIT_2.get_q_t(),
+                                    'Delta_H_2':    SPLIT_2.get_Delta_H(),
+                                    'H_ave_2':      SPLIT_2.get_H_0ave(),
+                                    'l_11_2':       SPLIT_2.get_l_11(),
+                                    'd_k_2':        SPLIT_2.get_d_k(),
+                                    'theta_2':      SPLIT_2.get_last_theta(),
+
+                                    'd_1_3':        SPLIT_3.get_d_1(), 
+                                    'd_next_3':     SPLIT_3.get_next_d(),
+                                    'alpha_1eef_3': setup_3_.alpha_1eef.m,
+                                    'Z_3':          SPLIT_3.get_Z(),
+                                    'Z_new_3':      SPLIT_3.get_Z_new(),
+                                    'Z_ratio_3':    SPLIT_3.get_Z_new()/SPLIT_3.get_Z(),
+                                    'q_t_3':        SPLIT_3.get_q_t(),
+                                    'Delta_H_3':    SPLIT_3.get_Delta_H(),
+                                    'H_ave_3':      SPLIT_3.get_H_0ave(),
+                                    'l_11_3':       SPLIT_3.get_l_11(),
+                                    'd_k_3':        SPLIT_3.get_d_k(),
+                                    'theta_3':      SPLIT_3.get_last_theta()
+                                    })],ignore_index=True)
+                                else:
+                                    continue   
+                            else:
+                                continue
+                    else:
+                        continue
+                else:
+                    continue    
+   
+    
+    #GLOBAL_DF = pd.concat([local_df])
+    
+    #print(GLOBAL_DF)
+    
+    #set_GLOBAL_DF(local_df)
+    
+    #print(GLOBAL_DF)
+    
+    #return GLOBAL_DF
 
 
+
+def HPC_SPLIT_SAME_PARAM_RANGES_FAST(
+    setup_1:HPC_SPLIT_SETUP,
+    setup_2:HPC_SPLIT_SETUP,
+    setup_3:HPC_SPLIT_SETUP,
+    d_1_range_1 = Q([0.6, 1.4, 0.1], 'm'), 
+    d_1_range_3 = Q([0.6, 1.4, 0.1], 'm'),
+    alpha_1eef_range = Q([9, 16, 1], 'deg'),
+    rho_k_range = Q([0.03, 0.07, 0.01], "" )
+):
+    if (isinstance(d_1_range_1,pint.Quantity)):           d_1_vec_1_ = np.arange(*(d_1_range_1.m))
+    else:                                               d_1_vec_1_ = np.arange(*(d_1_range_1))
+
+    if (isinstance(alpha_1eef_range, pint.Quantity)):   alpha_1eef_vec_ = np.arange(*(alpha_1eef_range.m))
+    else:                                               alpha_1eef_vec_ = np.arange(*(alpha_1eef_range))
+
+    if (isinstance(rho_k_range, pint.Quantity)):        rho_k_vec_ = np.arange(*(rho_k_range.m))
+    else:                                               rho_k_vec_ = np.arange(*(rho_k_range))
+
+    d_splits = np.array_split(d_1_vec_1_, 6)
+    
+    
+    t1 = Thread(target= local_calculate_split, args = (setup_1, setup_2, setup_3, d_splits[0], d_1_range_3, alpha_1eef_vec_, rho_k_vec_))
+    
+    t2 = Thread(target= local_calculate_split, args = (setup_1, setup_2, setup_3, d_splits[1], d_1_range_3, alpha_1eef_vec_, rho_k_vec_))
+    
+    t3 = Thread(target= local_calculate_split, args = (setup_1, setup_2, setup_3, d_splits[2], d_1_range_3, alpha_1eef_vec_, rho_k_vec_))
+    
+    t4 = Thread(target= local_calculate_split, args = (setup_1, setup_2, setup_3, d_splits[3], d_1_range_3, alpha_1eef_vec_, rho_k_vec_))
+    
+    t5 = Thread(target= local_calculate_split, args = (setup_1, setup_2, setup_3, d_splits[4], d_1_range_3, alpha_1eef_vec_, rho_k_vec_))
+    
+    t6 = Thread(target= local_calculate_split, args = (setup_1, setup_2, setup_3, d_splits[5], d_1_range_3, alpha_1eef_vec_, rho_k_vec_))
+    
+    # local_calculate_split(setup_1=setup_1,setup_2=setup_2,setup_3=setup_3,d_1_vec_1_=d_splits[0],alpha_1eef_vec_=alpha_1eef_vec_,rho_k_vec_=rho_k_vec_,d_1_range_3=d_1_range_3)
+    t1.start()
+    t2.start()
+    t3.start()
+    t4.start()
+    t5.start()
+    t6.start()
+    
+    t1.join()
+    t2.join()
+    t3.join()
+    t4.join()
+    t5.join()
+    t6.join()
+    
+    #GLOBAL_DF = pd.concat([df1, df2, df3], ignore_index=True)
+    
+    
+    
+    
 
 def HPC_SPLIT_SAME_PARAM_RANGES(
     setup_1:HPC_SPLIT_SETUP,
@@ -111,6 +355,7 @@ def HPC_SPLIT_SAME_PARAM_RANGES(
         'H_ave_1',
         'l_11_1',
         'd_k_1',
+        'theta_1',
         
         
         'd_1_2', 
@@ -124,6 +369,7 @@ def HPC_SPLIT_SAME_PARAM_RANGES(
         'H_ave_2',
         'l_11_2',
         'd_k_2',
+        'theta_2',
         
         'd_1_3',
         'd_next_3', 
@@ -136,6 +382,7 @@ def HPC_SPLIT_SAME_PARAM_RANGES(
         'H_ave_3',
         'l_11_3',
         'd_k_3',
+        'theta_3'
         ])
     
     for index, thing in enumerate(product(d_1_vec_1,         #0
@@ -158,7 +405,7 @@ def HPC_SPLIT_SAME_PARAM_RANGES(
                 SPLIT_2 = HPC_SPLIT_2(setup=setup_2_)
                 
                 if (SPLIT_2.isOK()): 
-                    if (SPLIT_2.get_d_k() > SPLIT_1.get_d_k()):
+                    if (SPLIT_2.get_d_k() >= SPLIT_1.get_d_k()):
                         for thing__ in product(
                             alpha_1eef_vec_, 
                             np.arange(round(SPLIT_2.get_next_d(), 2),d_1_range_3[1].m,d_1_range_3[2].m)
@@ -172,7 +419,7 @@ def HPC_SPLIT_SAME_PARAM_RANGES(
                             SPLIT_3 = HPC_SPLIT_2(setup=setup_3_)
                 
                             if (SPLIT_3.isOK()):
-                                if (SPLIT_3.get_d_k() > SPLIT_2.get_d_k()):
+                                if (SPLIT_3.get_d_k() >= SPLIT_2.get_d_k()):
                                     out_df = out_df.append({
                                     'n':            setup_1_.n.m, 
                                     'rho_k':        setup_1_.rho_k.m, 
@@ -188,7 +435,8 @@ def HPC_SPLIT_SAME_PARAM_RANGES(
                                     'H_ave_1':      SPLIT_1.get_H_0ave(),
                                     'l_11_1':       SPLIT_1.get_l_11(),
                                     'd_k_1':        SPLIT_1.get_d_k(),
-                            
+                                    'theta_1':      SPLIT_1.get_last_theta(),
+                                    
                                     'd_1_2':        SPLIT_2.get_d_1(), 
                                     'd_next_2':     SPLIT_2.get_next_d(),
                                     'alpha_1eef_2': setup_2_.alpha_1eef.m,
@@ -200,6 +448,7 @@ def HPC_SPLIT_SAME_PARAM_RANGES(
                                     'H_ave_2':      SPLIT_2.get_H_0ave(),
                                     'l_11_2':       SPLIT_2.get_l_11(),
                                     'd_k_2':        SPLIT_2.get_d_k(),
+                                    'theta_2':      SPLIT_2.get_last_theta(),
 
                                     'd_1_3':        SPLIT_3.get_d_1(), 
                                     'd_next_3':     SPLIT_3.get_next_d(),
@@ -212,6 +461,7 @@ def HPC_SPLIT_SAME_PARAM_RANGES(
                                     'H_ave_3':      SPLIT_3.get_H_0ave(),
                                     'l_11_3':       SPLIT_3.get_l_11(),
                                     'd_k_3':        SPLIT_3.get_d_k(),
+                                    'theta_3':      SPLIT_3.get_last_theta()
                                 },ignore_index=True)
                                     
                     else:
@@ -338,7 +588,7 @@ def HPC_SPLIT_RANGES(
             )
         
         # Если разбивка была просчитана 
-        if (local_split.__isOK):
+        if (local_split.isOK()):
             # Так как в быстром режиме не ведется учет единиц измерения, то просто получаем их
             if (FAST_MODE):
                 Z_vec[i]            = local_split.get_Z()
@@ -587,6 +837,8 @@ class HPC_SPLIT_2:
         try:
             if (self.__isDim): self.__turn_off_input_parameters_dimension()
             
+            if (self.__Z == 0): raise Exception('z =< 0')
+            if (self.__Z == 1): raise Exception('z == 1')
             # 3.1
             # ...
             
@@ -603,7 +855,7 @@ class HPC_SPLIT_2:
                 # 3.2. Определяем степень реактивности на среднем диаметре
                 rho = self.__rho_k + 1.8/(theta+1.8)
 
-                if (rho > 1): raise(Exception("RHO > 1"))
+                if (rho > 1): raise Exception("RHO > 1")
                 # 3.3. Определяем оптимальное значение u/c_f
                 uDIVu_cf = self.__phi*np.cos(np.radians(self.__alpha_1eef))/(2*np.sqrt(1-rho))
     
@@ -641,9 +893,7 @@ class HPC_SPLIT_2:
                 # Иначе добавляем итерацию и меняем приближающее значение на найденное в процессе цикла
                 else:
                     iterations_number += 1
-                    theta = (self.__d_1/self.__l_11)
-            
-            #self.__l_11.ito("m")   
+                    theta = (self.__d_1/self.__l_11)   
             
             # 4.
             # Высота рабочей лопатки
@@ -743,7 +993,6 @@ class HPC_SPLIT_2:
             self.__H_0ave = np.mean(self.__H_vec)
             
             # 10.7 Коэффициент возврата теплоты
-            #q_t_k = Q(4.8*10**(-4), 'kg/kJ')
             self.__q_t = 4.8*10**(-4) * (1 - self.__etaHPC_oi)*self.__H_0ave * (self.__Z-1)/self.__Z
             
             # 10.8 Уточненное количество ступеней группы
@@ -762,17 +1011,13 @@ class HPC_SPLIT_2:
             
             # Для автоматическогов выбора ступеней
             if ((self.__MODE == "OVERLOAD")and not(abs(int(self.__Z_new) - self.__Z) < 1)):
-                self.__Z = int(self.__Z_new)#Q(int(), "")
+                self.__Z = int(self.__Z_new)
                 self.__calculate_faster()
-            #elif (((self.__MODE == "OVERLOAD")and (int(self.__Z_new.m) == self.__Z + 1))):
-                #pass# not(int(self.__Z_new.m)+1 == self.__Z)
+
             if ((self.__MODE == "UNDERLOAD")and not(int(self.__Z_new) - self.__Z > 1)):
-                self.__Z = int(self.__Z_new)+1#Q(int(self.__Z_new) + 1, "")
+                self.__Z = int(self.__Z_new)+1
                 self.__calculate_faster()
-            #else:
-                #pass
-                
-            
+                      
         except Exception as s:
             self.__isOK = False
             #print(s)     
@@ -968,7 +1213,7 @@ class HPC_SPLIT_2:
             #print(s)
     
     # getters
-    
+    def get_last_theta(self):           return self.__theta_vec[len(self.__theta_vec) - 1]
     def get_d_k(self):                  return self.__d_k
     def get_d_1(self):                  return self.__d_1
     def get_q_t(self):                  return self.__q_t

@@ -9,8 +9,9 @@ import pandas as pd
 
 import time
 
-#aaa = GridProfile(M=0.414,type=1,in_angle=27.591,out_angle=17.611)
-
+# aaa = GridProfile(M=0.66,type=0,in_angle=70,out_angle=25)
+# aaa=GridProfile(name='С-70-25А')
+# print(aaa)
 # print(int(301.111))
 #print(aaa.get_grids_list())
 # df = pd.DataFrame(columns=[
@@ -91,37 +92,47 @@ import time
 # print(len({
     
 # }))
-# f = Stage(
-#     p_0=1.103,#1.103,
-#     t_0=410.7,
-#     G_0=185.7,
-#     d_hub=2.275-0.133,
-#     n = 50,
-#     reaction=0.337,
-#     alpha_0 = 90,
-#     alpha_1eef=10,
-#     H_0 = 184.5,#184.5,
-#     c_0 = 0,
-#     Delta_pr=0.013,
-#     kappa_vs = 0.5,
-#     )
-
-fu = Stage(
-    p_0=10.50,
-    t_0=439.2,
-    G_0=639,
-    d_hub = 0.5,
-    n = 50,
-    reaction=0.235,
+f = Stage(
+    p_0=0.631,#1.103,
+    t_0=231.6,
+    G_0=38.88,
+    d_hub=0.494,
+    n = 95,
+    reaction=0.29,
     alpha_0 = 90,
-    alpha_1eef=14,
-    H_0=38.33 - np.power(57, 2)/2000,
-    c_0 = 57,
-    Delta_pr=0.004,
-    kappa_vs=1
-)
+    alpha_1eef=16,
+    H_0 = 55.1,#184.5,
+    c_0 = 74.23,
+    Delta_pr = 0.003,
+    kappa_vs = 0.5,
+    )
 
-pprint(fu.get_results())
+pprint(f.get_results())
+# rotor_grid = GridProfile(
+#     M=0.381,
+#     type=1,
+#     in_angle=32.78977,
+#     out_angle=20.671
+# )
+# print(rotor_grid)
+
+
+# fu = Stage(
+#     p_0=10.50,
+#     t_0=439.2,
+#     G_0=639,
+#     d_hub = 0.5,
+#     n = 50,
+#     reaction=0.235,
+#     alpha_0 = 90,
+#     alpha_1eef=14,
+#     H_0=38.33 - np.power(57, 2)/2000,
+#     c_0 = 57,
+#     Delta_pr=0.004,
+#     kappa_vs=1
+# )
+
+# pprint(fu.get_results())
 # ff = Stage(
 #     p_0=8.73,
 #     t_0=570,

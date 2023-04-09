@@ -11,6 +11,8 @@ from . import ThPoint
 
 
 
+
+
 class Stage:
     """
         Класс "Ступень" создан для рассчета ступеней паровых турбин.
@@ -839,7 +841,6 @@ class ExistingGrid:
         resistance_moment_yy_in_edge:float,   # [см^3]    Момент сопротивления относительно YY, по вх. кромке
         resistance_moment_yy_out_edge:float,  # [см^3]    Момент сопротивления относительно YY, по вых. кромке
         
-        #ins_angle_exp,
         ):
         
         # КонструктоРРР
@@ -961,12 +962,13 @@ class GridProfile:
     
     def __str__(self) -> str:
         loc_str = ''
-        loc_str += 'name = {}\n'.format(str(self.__name))
+        loc_str += 'name = {}\n'.format(str(self.__name.to_list()[0]))
         loc_str += str(self.__existing_grid)
         return loc_str
         
             
-    # Getters     
+    # Getters   
+    def get_name(self): return (self.__name.to_list()[0])
     def get_grids_list(self): return self.__grids_list 
     def get_b(self): return self.__existing_grid.get_b()
     def get_B(self): return self.__existing_grid.get_B()
