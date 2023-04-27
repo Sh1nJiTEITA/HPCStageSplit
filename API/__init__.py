@@ -5,11 +5,14 @@ from .TCPv2 import *
 from .HPC_SPLIT import *
 from .LATEX_OUTPUT import *
 
+from .losses import *
 from .HPC_SPLIT import *
 from .Stage import *
 
 from .lstr import *
+from .tlstr import *
 
+from .losses import calculate_losses
 #make_math_string("3123", a=10, b=30)
 
 GLOBAL_DF = pd.DataFrame(columns=[

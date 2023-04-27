@@ -6,6 +6,7 @@ from pprint import pprint
 import numpy as np
 import pandas as pd
 
+from itertools import product
 
 import time
 
@@ -92,22 +93,35 @@ import time
 # print(len({
     
 # }))
-f = Stage(
-    p_0=0.631,#1.103,
-    t_0=231.6,
-    G_0=38.88,
-    d_hub=0.494,
-    n = 95,
-    reaction=0.29,
-    alpha_0 = 90,
-    alpha_1eef=16,
-    H_0 = 55.1,#184.5,
-    c_0 = 74.23,
-    Delta_pr = 0.003,
-    kappa_vs = 0.5,
-    )
+# f = Stage(
+#     p_0=0.631,#1.103,
+#     t_0=231.6,
+#     G_0=38.88,
+#     d_hub=0.494,
+#     n = 95,
+#     reaction=0.29,
+#     alpha_0 = 90,
+#     alpha_1eef=16,
+#     H_0 = 55.1,#184.5,
+#     c_0 = 74.23,
+#     Delta_pr = 0.003,
+#     kappa_vs = 0.5,
+# )
+profile = GridProfile(M=0.5, type=0,in_angle=90,out_angle=10)
 
-pprint(f.get_results())
+M = np.arange(0.3, 1.2, 0.1)
+in_angle = np.arange(50, 130, 10)
+out_angle = np.arange(8, 35, 1)
+
+
+for row in product(M, in_angle, out_angle):
+    local_grid = GridProfile(M=row[0],type=0,in_angle=row[1],out_angle=row[2])
+    print('isOK={}; M={}; inA={}; outA={}; {}'.format(local_grid.isOK(),row[0], row[1], row[2], local_grid.get_name_list()))
+    
+# print(profile)
+
+# print(profile.calculate_inst_angle(in_angle=30, t_rel=0.75, isAcc=False))
+# pprint(f.get_results())
 # rotor_grid = GridProfile(
 #     M=0.381,
 #     type=1,

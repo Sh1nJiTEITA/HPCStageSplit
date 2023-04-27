@@ -1,29 +1,28 @@
-# Далее идет класс для вывода в LaTeX'е
 import pint
 import numpy as np
 
-class lstr(str):
+class tlstr(str):
     
     # классическая версия str.format с изменением замены {} на [] и без поддержки [1] [2]
     def format(self, *args, **kwargs):
         
         for i in args:
-            self = self.replace("[]", lstr(i), 1)
+            self = self.replace("<<>>", tlstr(i), 1)
         
         for i in kwargs.items():
-            self = self.replace(lstr('[' + i[0] + ']'), lstr(i[1]))
+            self = self.replace(tlstr('<<' + i[0] + '>>'), tlstr(i[1]))
         
-        return lstr(self)
+        return tlstr(self)
     
     def format_comment(self, *args, **kwargs):
         
         for i in args:
-            self = self.replace("%[]", lstr(i), 1)
+            self = self.replace("%<<>>", tlstr(i), 1)
         
         for i in kwargs.items():
-            self = self.replace(lstr('%[' + i[0] + ']'), lstr(i[1]))
+            self = self.replace(tlstr('%<<' + i[0] + '>>'), tlstr(i[1]))
         
-        return lstr(self)
+        return tlstr(self)
     
     
     def __correct_round(self, value, ALIGN_MODE = 0):
@@ -37,7 +36,7 @@ class lstr(str):
             
         '''    
         
-        dot_pos = lstr(value).find(".")
+        dot_pos = tlstr(value).find(".")
         
         if 'e' in str(value):
             exp_mode = True
@@ -67,7 +66,7 @@ class lstr(str):
             last_null_pos = 0
             
                 # ищем
-            for i in lstr(value)[dot_pos + 1:]:
+            for i in tlstr(value)[dot_pos + 1:]:
                 if (i != '0'):
                     break
                 else:
@@ -127,7 +126,7 @@ class lstr(str):
     
     def dlformat(self, *args, **kwargs):
         '''
-            Версия lstr.format(...) с поддержкой единиц измерения с использоваением округления
+            Версия tlstr.format(...) с поддержкой единиц измерения с использоваением округления
         '''
         
         _args = list()
@@ -166,13 +165,13 @@ class lstr(str):
         
     def dformat(self, inlist=[],*args, **kwargs):
         '''
-            Версия lstr.format(...) с поддержкой единиц измерения с использоваением округления
+            Версия tlstr.format(...) с поддержкой единиц измерения с использоваением округления
         '''
         
         _list = list()
         for i in inlist:
             if (type(i) == np.ndarray):
-                raise Exception("this:{} is np.ndarray")
+                continue
             if (isinstance(i[1], pint.Quantity)):
                 if (type(i[1].m) == np.ndarray):
                     continue
@@ -183,18 +182,15 @@ class lstr(str):
         _args = list()
         for i in args:
             if (type(i) == np.ndarray):
-                raise Exception("this:{} is np.ndarray")
+                continue
             if (isinstance(i, pint.Quantity)):
-                if (type(i.m) == np.ndarray):
-                    continue
                 _args.append(self.__correct_round(i.m, ALIGN_MODE=0))
             else:
                 _args.append(i)
                 
         _kwargs = list()
         for i in kwargs.items():
-            # if (type(i[1]) == np.ndarray):
-            #     raise Exception("this:{} is np.ndarray")
+            
             if (isinstance(i[1], pint.Quantity)):
                 if (type(i[1].m) == np.ndarray):
                     continue
@@ -205,9 +201,9 @@ class lstr(str):
         return self.format(*tuple(_args), **dict(_kwargs), **dict(_list))
     
     def get_large(self):
-        local_lstr = self
-        local_lstr = lstr(r"\Large{") + local_lstr + lstr(r"} \\ \ \\")
-        return local_lstr
+        local_tlstr = self
+        local_tlstr = tlstr(r"\Large{") + local_tlstr + tlstr(r"} \\ \ \\")
+        return local_tlstr
 
 def get_dict_of_class(input_class):
     vec = {}
@@ -222,12 +218,4 @@ def get_dict_of_class(input_class):
         
     return vec
 
-a = lstr("[][][b][c]")
-
-#print(a.format(1,2,b=" 13",c=" vd"))
-
-#print("{}{}{b}".format("AAA", "b", b="3"))
-#swap_br_in_math_string("3213123", a=10, b=20)
-#Math(lstr("\Delta [H_0] = [H_0v]\ кДж/кг").format(H_0="H_0",H_0v=33))
-
-#print(type(lstr(r"3.2 \ \theta = []").dformat(theta)))
+a = tlstr("[][][b][c]")

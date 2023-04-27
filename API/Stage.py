@@ -3,10 +3,11 @@
 # Общие
 import numpy as np
 import pandas as pd
+from pint import Quantity as Q
 
 # Собственные
 from . import ThPoint
-
+from . import calculate_losses
 
 
 
@@ -36,8 +37,7 @@ class Stage:
         extra_param:dict = {},
         
         kappa_vs = 0.5,
-        
-        isStageOptimal:bool = True, # Рассчитывается ли ступень на оптимальные параметры
+    
         **kwargs
     ):
         ''' 
@@ -131,6 +131,9 @@ class Stage:
         self.__beta_2eef    = None      # [deg]      Эффективный угол выхода потока из рабочей решетки
         self.__beta_2       = None      # [deg]      Угол выхода потока из сопловой решетки в относительном движении
 
+        self.__alpha_inst   = None      # [deg]      Установочный угол сопловой решетки
+        self.__beta_inst    = None      # [deg]      Установочный угол рабочей решетки 
+        
         # Скорости -------------------- # -----------------------------------------------------------------------------------
         
         self.__u            = None      # [м/c]      Окружная скорость 
@@ -169,15 +172,46 @@ class Stage:
         self.__F_1          = None      # [м^2]      Площадь сопловой решетки
         self.__F_2          = None      # [м^2]      Площадь рабочей решетки
         
+        self.__z_1          = None      # []         Число сопловых лопаток
+        self.__z_2          = None      # []         Число рабочих лопаток
+        
+        self.__t_1          = None      # [м]        Шаг сопловой решетки
+        self.__t_2          = None      # [м]        Шаг рабочей решетки
+        
+        self.__t_1_rel      = None      # []         Относительный шаг сопловой решетки
+        self.__t_2_rel      = None      # []         Относительный шаг рабочей решетки
+        
+        self.__scale_1      = None      # []         Масштаб сопловой решетки, относительно модельной
+        self.__scale_2      = None      # []         Масштаб рабочей решетки, относительно модельной
+        
+        self.__B_1          = None      # [м]        Ширина сопловой решетки
+        self.__B_2          = None      # [м]        Ширина сопловой решетки
+        
+        self.__throat_1     = None      # [м]        Длина горла сопловой решетки
+        self.__throat_2     = None      # [м]        Длина горла рабочей решетки
+        
+        self.__R_edge_in_1  = None      # [м]        Радиус входной кромки сопловой решетки
+        self.__R_edge_out_1 = None      # [м]        Радиус выходной кромки сопловой решетки
+        
+        self.__R_edge_in_2  = None      # [м]        Радиус входной кромки сопловой решетки
+        self.__R_edge_out_2 = None      # [м]        Радиус выходной кромки сопловой решетки
+        
+        
+        
+        
         # Потери ---------------------- # ----------------------------------------------------------------------------
         
         self.__Delta_Hs     = None      # [кДж/кг]   Потери в сопловой решетке
         self.__Delta_Hr     = None      # [кДж/кг]   Потери в рабочей решетке
         self.__Delta_Hout   = None      # [кДж/кг]   Потери с выходной скоростью
-        self.__xi_s         = None      # []         Относительные потери в сопловой решетке
-        self.__xi_r         = None      # []         Относительные потери в рабочей решетке
+        self.__xi_sprof     = None      # []         Относительные профильные потери в сопловой решетке
+        self.__xi_rprof     = None      # []         Относительные профильные потери в рабочей решетке
+        self.__xi_ssec      = None      # []         Относительные суммарный потери в сопловой решетке
+        self.__xi_rsec      = None      # []         Относительные суммарный потери в рабочей решетке
+        self.__xi_sann      = None      # []         Относительные концевые потери в сопловой решетке
+        self.__xi_rann      = None      # []         Относительные концевые потери в рабочей решетке 
         
-        self.__eff_ol       = None          # []         Относительный лопаточный КПД ступени
+        self.__eff_ol       = None      # []         Относительный лопаточный КПД ступени
         
         # Экономически-динамические п.  # ----------------------------------------------------------------------------
         
@@ -194,7 +228,10 @@ class Stage:
         self.__reaction = reaction      # []         Степень рективности ступени на среднем диаметре
         self.__kappa_vs = kappa_vs      # []         Коэффициент выходной скорости
         
+        self.__vane_grid    = None      # ...        Параметры сопловой решетки
         self.__rotor_grid   = None      # ...        Параметры рабочей решетки
+        
+        self.__isOK         = None      # ...        Просчитывается ли ступень
         
         # Основной расчет ступени 
         self.calculate()
@@ -207,6 +244,7 @@ class Stage:
         
         # Фиктивная скорость ступени
         self.__c_f = np.sqrt(2000*self.__fH_0)
+        
     def __calculate_vane_thermal_points(self, phi):
         """
             Раасчитывает термодинамические точки на h,s-диаграмме для сопловой решетки
@@ -227,6 +265,7 @@ class Stage:
 
         # Теоретическая скорость в сопловой решетке
         self.__c_1t = np.sqrt(2000*self.__fH_0s)
+        self.__c_1 = self.__c_1t * phi
         
         # Расчет потерь в сопловой решетке
         self.__Delta_Hs = np.power(self.__c_1t, 2) / 2000 * (1 - np.power(phi, 2))
@@ -235,6 +274,7 @@ class Stage:
         h_1 = self.__Point_1t.h(0) + self.__Delta_Hs
         p_1 = self.__Point_1t.p(0)
         self.__Point_1 = ThPoint(p=p_1, h=h_1)
+        
     def __calculate_rotor_thermal_points(self, psi):
         """
             Рассчитывает термодинамические точки на h,s-диаграмме для рабочей решетки
@@ -265,11 +305,14 @@ class Stage:
         
         # Т.Т. действительных статических параметров на выходе из рабочей решетки
         h_2 = self.__Point_2t.h(0) + self.__Delta_Hr
-        self.__Point_2 = ThPoint(p=p_2, h=h_2)       
+        self.__Point_2 = ThPoint(p=p_2, h=h_2)   
+            
     def __calculate_out_stage_thermal_points(self):
         """
-            Рассчитывает термодинамические точки выхода и ступени
+            Рассчитывает термодинамические точки выхода из ступени
         """
+        
+        self.__X = self.__u / self.__c_f
         
         # Потери с выходной скоростью
         self.__Delta_Hout = np.power(self.__c_2, 2)/2000
@@ -423,7 +466,8 @@ class Stage:
             Функция предназначена для расчета площади сопловой решетки и угла выхода при числе Маха М < 1.
         """ 
         # Абсолютный угол выхода потока из сопловой решетки, в градусах
-        alpha_1 = self.__alpha_1 = np.rad2deg(np.arcsin(mu_1 * np.sin(np.deg2rad(self.__alpha_1eef))/phi))
+        # alpha_1 = np.rad2deg(np.arcsin(mu_1 * np.sin(np.deg2rad(self.__alpha_1eef))/phi))
+        alpha_1 = self.__alpha_1eef
         
         # Выходная площадь сопловой решетки
         F_1 = self.__G_0 * self.__Point_1t.v(0) / mu_1 / self.__c_1t
@@ -483,7 +527,8 @@ class Stage:
         q = self.__c_1t * v_1cr / c_1cr / self.__Point_1t.v(0)
                 
         # Абсолютный угол выхода потока из сопловой решетки, в градусах
-        alpha_1 = np.rad2deg((np.arcsin(mu_1 * np.sin(np.deg2rad(self.__alpha_1eef)/phi/q))))
+        # alpha_1 = np.rad2deg((np.arcsin(mu_1 * np.sin(np.deg2rad(self.__alpha_1eef)/phi/q))))
+        alpha_1 = np.rad2deg((np.arcsin(np.sin(np.deg2rad(self.__alpha_1eef)/q))))
         
         # Выходная площадь сопловой решетки
         F_1 = self.__G_0 * v_1cr / mu_1 / c_1cr
@@ -509,25 +554,18 @@ class Stage:
             # Выходная площадь сопловой решетки & Абсолютный угол выхода потока из сопловой решетки
             self.__F_1, self.__alpha_1 = self.__get_critical_vane_area_and_alpha_1(phi=phi, mu_1=mu_1)
         
-        # Если ступень рассчитывается на максимальный лопаточный КПД
-        if (self.__is_stage_optimal):
-            # Значение (u/c_ф)_опт
-            self.__X = phi * np.cos(np.radians(self.__alpha_1))/(2*np.sqrt(1-self.__reaction))   
-              
-        # Если ступень рассчитывается НЕ на максимальный лопаточный КПД
-        else:
-            pass # Х - задан в конструкторе
+        # Коэффициенты квадратного уравнения:
+        koef_a = np.pi * np.sin(np.deg2rad(self.__alpha_1))
+        koef_b = np.pi * self.__d_hub * np.sin(np.deg2rad(self.__alpha_1))
+        
+        # Выходная высота сопловых лопаток 
+        self.__l_1 = (-koef_b + np.sqrt(koef_b**2 + 4*koef_a*self.__F_1))/(2 * koef_a)
+        
+        # Средний диаметр 
+        self.__d = self.__d_hub + self.__l_1
         
         # Окружная скорость
-        self.__u = self.__X * self.__c_f
-        
-        # Средний диаметр
-        self.__d = self.__u / np.pi / self.__n
-        #print("d", self.__d)
-            
-        # Выходная высота сопловых лопаток 
-        self.__l_1 = self.__F_1/(np.pi * self.__d * np.sin(np.deg2rad(self.__alpha_1eef)))
-        #print('l_1', self.__l_1)
+        self.__u = np.pi * self.__d * self.__n
         
         # Если лопатки получились меньше чем 0.013 мм
         if (self.__l_1 < 0.013):
@@ -587,20 +625,52 @@ class Stage:
         
         # Абсолютный выход потока из рабоче решетки
         self.__alpha_2 = self.__beta_2 + np.rad2deg(np.arccos((np.power(self.__c_2,2)+np.power(self.__w_2,2)-np.power(self.__u,2))/(2*self.__w_2*self.__c_2)))
-        
-    def __get_empirical_phi_mu_1(b_1,l_1):
-        """ Возвращает рассчитанный на основе эмпирических зависимостей 
-            коэффициент скорости и расхода для сопловой решетки. """
-        
-        return (0.98 - 0.008*(b_1/l_1)),(0.982 - 0.005*(b_1/l_1))
     
-    def __get_empirical_psi_mu_2(b_2,l_2):
-        """ Возвращает рассчитанный на основе эмпирических зависимостей 
-            коэффициент скорости и расхода для рабочей решетки. """
-            
-        return (0.96 - 0.014*(b_2/l_2)),(0.965-0.01*(b_2/l_2))
-
-    def __select_rotor_grid(self):
+    def __select_vane_grid(self, b_1):
+        """
+            Выбирает сопловую решетку из таблицы, расположенной в Щегляеве, том 1
+        """
+        self.__vane_grid = GridProfile(
+            M=self.__M_1t,           # Число Маха в рабочей решетке
+            type=0,                  # Тип решетки, 1 - рабочая
+            in_angle=self.__alpha_0, # Входной угол
+            out_angle=self.__alpha_1 # Выходной угол
+        )
+        # Если решетка не подобралась -> исключение
+        if not self.__vane_grid.isOK():
+            raise Exception('Vane Grid was not selected 0_0')
+        
+        # Дробное число сопловых лопаток
+        self.__z_1 = np.pi * self.__d / self.__vane_grid.get_rel_t() / b_1
+        
+        # Целое число сопловых лопаток (четное)
+        self.__z_1 = round(self.__z_1 / 2) * 2
+        
+        # Шаг сопловой решетки
+        self.__t_1 = np.pi * self.__d / self.__z_1
+        
+        # Относительный шаг сопловой решетки
+        self.__t_1_rel = self.__t_1 / b_1
+        
+        # Рассчет установочного угла
+        self.__alpha_inst = self.__vane_grid.calculate_inst_angle(in_angle=self.__alpha_0, t_rel = self.__t_1_rel)
+        
+        # Масштаб для сопловой решетки
+        self.__scale_1 = b_1 / self.__vane_grid.get_b()
+        
+        # Ширина сопловой решетки
+        self.__B_1 = b_1 * np.sin(np.deg2rad(self.__alpha_inst))
+        
+        # Горло сопловой решетки
+        self.__throat_1 = self.__scale_1 * self.__vane_grid.get_a()
+        
+        # Радиусы входной и выходной кромок
+        self.__R_edge_in_1 = self.__scale_1 * self.__vane_grid.get_Delta_in()
+        self.__R_edge_out_1 = self.__scale_1 * self.__vane_grid.get_Delta_out()
+        
+        
+    
+    def __select_rotor_grid(self,b_2):
         """
             Выбирает рабочую решетку из таблицы, расположенной в Щегляеве, том 1
         """
@@ -611,6 +681,38 @@ class Stage:
             in_angle=self.__beta_1, # Входной угол
             out_angle=self.__beta_2 # Выходной угол
         )
+        # Если решетка не подобралась -> исключение
+        if not self.__rotor_grid.isOK():
+            raise Exception('Rotor Grid was not selected 0_0')
+        
+        # Дробное число рабочих лопаток
+        self.__z_2 = np.pi * self.__d / self.__rotor_grid.get_rel_t() / b_2
+        
+        # Целое число рабочих лопаток (четное)
+        self.__z_2 = int(self.__z_1)
+        
+        # Шаг рабочих решетки
+        self.__t_2 = np.pi * self.__d / self.__z_2
+        
+        # Относительный шаг рабочих решетки
+        self.__t_2_rel = self.__t_2 / b_2
+        
+        # Рассчет установочного угла
+        self.__beta_inst = self.__rotor_grid.calculate_inst_angle(in_angle=self.__beta_1, t_rel = self.__t_2_rel)
+        
+        # Масштаб для сопловой решетки
+        self.__scale_2 = b_2 / self.__rotor_grid.get_b()
+        
+        # Ширина сопловой решетки
+        self.__B_2 = b_2 * np.sin(np.deg2rad(self.__beta_inst))
+        
+        # Горло сопловой решетки
+        self.__throat_2 = self.__scale_2 * self.__rotor_grid.get_a()
+        
+        # Радиусы входной и выходной кромок
+        self.__R_edge_in_2 = self.__scale_2 * self.__rotor_grid.get_Delta_in()
+        self.__R_edge_out_2 = self.__scale_2 * self.__rotor_grid.get_Delta_out()
+        
         
     # TODO
     def __check_bending_stresses(self, b_2) -> bool:
@@ -638,11 +740,54 @@ class Stage:
         else:
             return False
 
-    def __calculate_losses(self, type):
+    def __calculate_losses(self, type, b):
         '''
         Расчет потерь
         '''
-        return 0.04
+    
+        if (type == 's'):
+            self.__xi_sprof, self.__xi_ssec, self.__xi_sann = calculate_losses(
+                inlet_angle = self.__alpha_0,
+                outlet_angle = self.__alpha_1,
+                blade_inlet_angle = self.__alpha_0 - 5,
+                design_inc = 0,
+                axial_chord = self.__B_1,
+                throat = self.__throat_1,
+                pitch = self.__t_1,
+                te_radius = self.__R_edge_out_1,
+                chord = b,
+                height = self.__l_1,
+                nu = (self.__Point_0.kv() + self.__Point_1t.kv())/2,
+                ks = 1e-5,
+                w1 = self.__c_0,
+                w2 = self.__c_1
+            )
+            self.__xi_sann = self.__xi_ssec - self.__xi_sprof
+            
+            return self.__xi_ssec
+        elif (type == 'r'):
+            self.__xi_rprof, self.__xi_rsec, self.__xi_rann = calculate_losses(
+                inlet_angle = self.__beta_1,
+                outlet_angle = self.__beta_2,
+                blade_inlet_angle = self.__beta_1 - 5,
+                design_inc = 0,
+                axial_chord = self.__B_2,
+                throat = self.__throat_2,
+                pitch = self.__t_2,
+                te_radius = self.__R_edge_out_2,
+                chord = b,
+                height = self.__l_2,
+                nu = (self.__Point_1.kv() + self.__Point_2t.kv())/2,
+                ks = 1e-5,
+                w1 = self.__w_1,
+                w2 = self.__w_2
+            )
+            self.__xi_rann = self.__xi_rsec - self.__xi_rprof
+            
+            return self.__xi_rsec
+        else:
+            raise Exception('Unknown grid type in input parameters')
+        
     
     def __calculate_power_efficiency_radial_force(self):
         """Функция рассчитывает мощность, КПД, радиальные усилия в ступени
@@ -691,19 +836,7 @@ class Stage:
     
     def calculate(self):
         '''
-        Проводим расчет ступени
-        Примерный алгоритм расчета:
-        1. Задаются хорды
-        2. Задаются коэффициенты скорости и расхода для сопловой решетки
-        3. Просчитывается сопловая решетка
-        4. Просчитывается рабочая решетка
-        5. Уточняются коэффициенты скорости и расхода, при не совпадении в три знака перед запятой
-        алогритм начинается с пункта 2. но с уточненными коэффициентами скорости и расхода
-        5. Просчитывается треугольник скоростей для сопловой решетки
-        6. Просчитывается треугольник скоростей для рабочей решетки
-        7. Подбирается профиль для рабочей решетки 
-        8. Рабочая лопатка проверяется на изгиб, при невыполнении условий возвращается к пункту 1, хорда увеличивается (но как?)
-        9. ...
+        Последовательный расчет ступени
         '''
         
         # 1. Первое минимальное приближение хорд лопаток
@@ -723,7 +856,7 @@ class Stage:
         self.__calculate_full_heat_transfer()
         
         # 3.
-        while (not(isBendingOK) and not(isSpeedKoefsOK)):
+        while not(isBendingOK * isSpeedKoefsOK):
             
             # 3.1. Рассчитываем параметры для сопловой решетки в h,s-диаграммы
             self.__calculate_vane_thermal_points(phi=phi)
@@ -741,8 +874,11 @@ class Stage:
             # 3.5. Рассчитываем площадь и длину рабочей лопатки
             self.__calculate_rotor_area_and_length(psi=psi, mu_2=mu_2)
             
-            # 3.6. Подбираем рабочую решетку
-            self.__select_rotor_grid()
+            # 3.6.0 Подбираем сопловую решетку
+            self.__select_vane_grid(b_1=b_1)
+            
+            # 3.6.1 Подбираем рабочую решетку
+            self.__select_rotor_grid(b_2=b_2)
             
             # 3.7. Рассчитываем треугольник скоростей в рабочей решетке 
             self.__calculate_rotor_speed_triangle(psi=psi)
@@ -757,23 +893,26 @@ class Stage:
                 
             # 3.9. Если прошлое условие на изгиб выполнилось, начинаем уточнять коэффициенты скорости
             # Для сопловой решетки 
-            new_phi = np.sqrt(1 - self.__calculate_losses(type='s'))
+            new_phi = np.sqrt(1 - self.__calculate_losses(type='s',b=b_1))
             # Для рабочей решетки
-            new_psi = np.sqrt(1 - self.__calculate_losses(type='r'))
+            new_psi = np.sqrt(1 - self.__calculate_losses(type='r',b=b_2))
             
             # Если совпали коэффициенты
             if ((round(new_phi, 3) == round(phi, 3)) & (round(new_psi, 3) == round(psi, 3))):
                 isSpeedKoefsOK = True
-            
+                
             # Если коэффициенты не совпали, то совершаем расчет заново
             if (round(new_phi, 3) != round(phi, 3)):
                 phi = new_phi
             if (round(new_psi, 3) != round(psi, 3)):
                 psi = new_psi
             
+            
         self.__b_1 = b_1
         self.__b_2 = b_2    
-            
+        self.__phi = phi
+        self.__psi = psi
+        
         
         # 4. Расчет т.т на выходе ступени
         self.__calculate_out_stage_thermal_points()
@@ -800,12 +939,14 @@ class Stage:
             'X':        self.__X,
             'Delta_Hs': self.__Delta_Hs,
             'Delta_Hr': self.__Delta_Hr,
-            'xi_s':     self.__xi_s, 
-            'xi_r':     self.__xi_r, 
+            'phi':      self.__phi,
+            'psi':      self.__psi,
             'eff_ol':   self.__eff_ol,
             'E_0':      self.__E_0,
             'b_1':      self.__b_1,
-            'b_2':      self.__b_2
+            'b_2':      self.__b_2,
+            'Name_1':   self.__vane_grid.get_name(),
+            'Name_2':   self.__rotor_grid.get_name()
         }
     
     def get_l_1(self): return self.__l_1
@@ -821,25 +962,26 @@ class ExistingGrid:
         self,
         # Геометрические характеристики
         # ----------------------------------- # ---------------------------------------------------------------
-        b:float,                              # [мм]      Хорда 
-        B:float,                              # [мм]      Ширина
-        min_sec_length:float,                 # [мм]      Горло
-        rel_t:float,                          # []        Относительный шаг
-        ins_angle:float,                      # [deg]     Установочный угол
-        in_edge:float,                        # [мм]      Входная кромка
-        out_edge:float,                       # [мм]      Выходная кромка
+        b:float,                              # [м]      Хорда 
+        B:float,                              # [м]      Ширина
+        min_sec_length:float,                 # [м]      Горло
+        rel_t:float,                          # []       Относительный шаг
+        ins_angle:float,                      # [deg]    Установочный угол
+        in_edge:float,                        # [м]      Входная кромка
+        out_edge:float,                       # [м]      Выходная кромка
+        inst_angle_expr:str,                  #          Выражение для определения установочного угла
         #------------------------------------ # ---------------------------------------------------------------
         # Прочностные характеристики   
         # ----------------------------------- # ---------------------------------------------------------------
-        x_weight_center:float,                # [мм]      x-координата центра тяжести
-        y_weight_center:float,                # [мм]      y-координата центра тяжестт
-        profile_area:float,                   # [см^2]    Площадь профиля
-        inertia_moment_xx:float,              # [см^4]    Момент инерции относительно ХХ
-        inertia_moment_yy:float,              # [см^4]    Момент инерции относительно YY
-        resistance_moment_xx_back:float,      # [см^3]    Момент сопротивления относительно ХХ, по спинке
-        resistance_moment_xx_edge:float,      # [см^3]    Момент сопротивления относительно ХХ, по кромкам
-        resistance_moment_yy_in_edge:float,   # [см^3]    Момент сопротивления относительно YY, по вх. кромке
-        resistance_moment_yy_out_edge:float,  # [см^3]    Момент сопротивления относительно YY, по вых. кромке
+        x_weight_center:float,                # [м]      x-координата центра тяжести
+        y_weight_center:float,                # [м]      y-координата центра тяжестт
+        profile_area:float,                   # [м^2]    Площадь профиля
+        inertia_moment_xx:float,              # [м^4]    Момент инерции относительно ХХ
+        inertia_moment_yy:float,              # [м^4]    Момент инерции относительно YY
+        resistance_moment_xx_back:float,      # [м^3]    Момент сопротивления относительно ХХ, по спинке
+        resistance_moment_xx_edge:float,      # [м^3]    Момент сопротивления относительно ХХ, по кромкам
+        resistance_moment_yy_in_edge:float,   # [м^3]    Момент сопротивления относительно YY, по вх. кромке
+        resistance_moment_yy_out_edge:float,  # [м^3]    Момент сопротивления относительно YY, по вых. кромке
         
         ):
         
@@ -861,7 +1003,8 @@ class ExistingGrid:
         self.__resistance_moment_xx_edge = resistance_moment_xx_edge
         self.__resistance_moment_yy_in_edge = resistance_moment_yy_in_edge
         self.__resistance_moment_yy_out_edge = resistance_moment_yy_out_edge
-    
+        self.__inst_angle_expr = inst_angle_expr
+        
     def __str__(self) -> str:
         out_str = ""
         out_str += 'b = {}\n'.format(self.__b)
@@ -880,6 +1023,7 @@ class ExistingGrid:
         out_str += 'resistance_moment_xx_edge = {}\n'.format(self.__resistance_moment_xx_edge)
         out_str += 'resistance_moment_yy_in_edge = {}\n'.format(self.__resistance_moment_yy_in_edge)
         out_str += 'resistance_moment_yy_out_edge = {}\n'.format(self.__resistance_moment_yy_out_edge)
+        out_str += 'inst_angle_expr = {}\n'.format(self.__inst_angle_expr)
         return out_str
     
     # Getters      
@@ -899,7 +1043,7 @@ class ExistingGrid:
     def get_Wxx_edge(self): return self.__resistance_moment_xx_edge
     def get_Wyy_in_edge(self): return self.__resistance_moment_yy_in_edge
     def get_Wyy_out_edge(self): return self.__resistance_moment_yy_out_edge
-    
+    def get_inst_angle_expr(self): return self.__inst_angle_expr
 
 class GridProfile:
     """
@@ -929,32 +1073,40 @@ class GridProfile:
                 # Ограничение по выходному углу
                 loc_par = loc_par[(loc_par['in_angle_b'] <= in_angle) & (loc_par['in_angle_e'] > in_angle)]
                 
-            self.__grids_list = loc_par
-        
-            # Если строка найдена не одна или не найдена
-            if (len(loc_par) != 1):
-                raise Exception("Invalid number of founded grids, number of grids: {}".format(len(loc_par)))
+            # self.__grids_list = loc_par
             
+            # Обновляем индексы строк
+            # self.__grids_list.reset_index(drop=True, inplace=True)
+            loc_par.reset_index(drop=True, inplace=True)
+            
+            if loc_par.empty: self.__name_list = []
+            else: self.__name_list = loc_par['Name'].tolist()
+            
+            
+            # Если строка найдена не одна или не найдена
+            # if (len(loc_par) != 1):
+            #     raise Exception("Invalid number of founded grids, number of grids: {}".format(len(loc_par)))
             
 
-            self.__name = (loc_par['Name'])
+            self.__name = (loc_par.loc[0, 'Name'])
             self.__existing_grid = ExistingGrid(
-                b                               = float(loc_par['b']),
-                B                               = float(loc_par['B']),
-                min_sec_length                  = float(loc_par['a']),
-                rel_t                           = float(loc_par['rel_t']),
-                ins_angle                       = float(loc_par['ins_angle']),
-                in_edge                         = float(loc_par['Delta_in']),
-                out_edge                        = float(loc_par['Delta_out']),
-                x_weight_center                 = float(loc_par['center_X']),
-                y_weight_center                 = float(loc_par['center_Y']),
-                profile_area                    = float(loc_par['F']),
-                inertia_moment_xx               = float(loc_par['Ixx']),
-                inertia_moment_yy               = float(loc_par['Iyy']),
-                resistance_moment_xx_back       = float(loc_par['Wxx_back']),
-                resistance_moment_xx_edge       = float(loc_par['Wxx_edge']),
-                resistance_moment_yy_in_edge    = float(loc_par['Wyy_in_edge']),
-                resistance_moment_yy_out_edge   = float(loc_par['Wyy_out_edge'])
+                b                               = float(loc_par.loc[0, 'b']),
+                B                               = float(loc_par.loc[0, 'B']),
+                min_sec_length                  = float(loc_par.loc[0, 'a']),
+                rel_t                           = float(loc_par.loc[0, 'rel_t']),
+                ins_angle                       = float(loc_par.loc[0, 'ins_angle']),
+                in_edge                         = float(loc_par.loc[0, 'Delta_in']),
+                out_edge                        = float(loc_par.loc[0, 'Delta_out']),
+                x_weight_center                 = float(loc_par.loc[0, 'center_X']),
+                y_weight_center                 = float(loc_par.loc[0, 'center_Y']),
+                profile_area                    = float(loc_par.loc[0, 'F']),
+                inertia_moment_xx               = float(loc_par.loc[0, 'Ixx']),
+                inertia_moment_yy               = float(loc_par.loc[0, 'Iyy']),
+                resistance_moment_xx_back       = float(loc_par.loc[0, 'Wxx_back']),
+                resistance_moment_xx_edge       = float(loc_par.loc[0, 'Wxx_edge']),
+                resistance_moment_yy_in_edge    = float(loc_par.loc[0, 'Wyy_in_edge']),
+                resistance_moment_yy_out_edge   = float(loc_par.loc[0, 'Wyy_out_edge']),
+                inst_angle_expr                 = str(loc_par.loc[0, 'ins_angle_expression'])
             )
             
         except Exception as ex:
@@ -962,13 +1114,15 @@ class GridProfile:
     
     def __str__(self) -> str:
         loc_str = ''
-        loc_str += 'name = {}\n'.format(str(self.__name.to_list()[0]))
+        # loc_str += 'name = {}\n'.format(str(self.__name.to_list()[0]))
+        loc_str += str(self.__name) + '\n'
         loc_str += str(self.__existing_grid)
         return loc_str
         
             
     # Getters   
-    def get_name(self): return (self.__name.to_list()[0])
+    def get_name(self): return self.__name
+    def get_name_list(self): return self.__name_list
     def get_grids_list(self): return self.__grids_list 
     def get_b(self): return self.__existing_grid.get_b()
     def get_B(self): return self.__existing_grid.get_B()
@@ -986,3 +1140,16 @@ class GridProfile:
     def get_Wxx_edge(self): return self.__existing_grid.get_Wxx_edge()
     def get_Wyy_in_edge(self): return self.__existing_grid.get_Wyy_in_edge()
     def get_Wyy_out_edge(self): return self.__existing_grid.get_Wyy_out_edge()
+    
+    def calculate_inst_angle(self, in_angle, t_rel, isAcc = True):
+        if isAcc:
+            if 'angle' in self.__existing_grid.get_inst_angle_expr():
+                return eval(self.__existing_grid.get_inst_angle_expr().format(angle = in_angle, t_rel = t_rel))
+            else:
+                return float(self.__existing_grid.get_inst_angle_expr())
+        else:
+            return self.get_standart_ins_angle()
+        
+    def isOK(self):
+        if len(self.__name_list) != 0: return True
+        else: return False

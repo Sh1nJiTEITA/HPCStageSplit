@@ -9,6 +9,10 @@ from pint import get_application_registry, Quantity
 un = get_application_registry()
 Q = Quantity
 
+from datetime import datetime
+
+import os
+
 import pandas as pd
 import numpy as np
 
@@ -23,6 +27,57 @@ from threading import Thread
 # ):
 
 
+GLOBAL_DF2 = pd.DataFrame(columns=[
+    'n',
+       
+    'isOK_1',
+    'is_d_k_OK_1',
+    'rho_k_1',
+    'd_1_1',
+    'd_next_1',
+    'alpha_1eef_1',
+    'Z_1',
+    'Z_new_1',
+    'Z_ratio_1',
+    'q_t_1',
+    'Delta_H_1',
+    'H_ave_1',
+    'l_11_1',
+    'd_k_1',
+    'theta_1',
+        
+    'isOK_2',
+    'is_d_k_OK_2',
+    'rho_k_2',
+    'd_1_2',
+    'd_next_2',
+    'alpha_1eef_2',
+    'Z_2',
+    'Z_new_2',
+    'Z_ratio_2',
+    'q_t_2',
+    'Delta_H_2',
+    'H_ave_2',
+    'l_11_2',
+    'd_k_2',
+    'theta_2',
+        
+    'isOK_3',
+    'is_d_k_OK_3',
+    'rho_k_3',
+    'd_1_3',
+    'd_next_3',
+    'alpha_1eef_3',
+    'Z_3',
+    'Z_new_3',
+    'Z_ratio_3',
+    'q_t_3',
+    'Delta_H_3',
+    'H_ave_3',
+    'l_11_3',
+    'd_k_3',
+    'theta_3'
+])
 
 GLOBAL_DF = pd.DataFrame(columns=[
         'n', 
@@ -116,40 +171,201 @@ class HPC_SPLIT_SETUP:
         self.FAST_MODE = FAST_MODE
         self.ID = ID
 
-def local_calculate_split(setup_1, setup_2, setup_3, d_1_vec_1_,d_1_range_3, alpha_1eef_vec_, rho_k_vec_):
-    global GLOBAL_DF
+
+            
+            
+def local_calculate_split_smart(path,thread_number,
+                                setup_1:HPC_SPLIT_SETUP, setup_2:HPC_SPLIT_SETUP, setup_3:HPC_SPLIT_SETUP, 
+                                d_1_vec_1_, alpha_1eef_vec_, rho_k, 
+                                delta_d_2, delta_d_3, 
+                                accurancy = 2, d_step = 0.05):
     
-    class split_parameters_array_list:
-        def __init__(self, size):
-            self.rho_k = np.zeros(size)    
-            self.d_1 = np.zeros(size)
-            self.d_next = np.zeros(size)
-            self.alpha_1eef = np.zeros(size)
-            self.Z = np.zeros(size)
-            self.Z_new = np.zeros(size)
-            self.Z_ratio = np.zeros(size)
-            self.q_t = np.zeros(size)
-            self.Delta_H = np.zeros(size)
-            self.H_ave = np.zeros(size)
-            self.l_11 = np.zeros(size)
-            self.d_k = np.zeros(size)
-            self.theta = np.zeros(size)
+    
+    main_hub_reaction = Q(rho_k, '')
+    
+    setup_1.rho_k = main_hub_reaction
+    setup_2.rho_k = main_hub_reaction
+    setup_3.rho_k = main_hub_reaction
+    
+    pr = product(d_1_vec_1_,alpha_1eef_vec_)
+    pr_number = int(len(list(pr)))
+    
+    
+    max_len = int(len(list(product(d_1_vec_1_,alpha_1eef_vec_)))**4.5)
+    
+    main_list_1 = split_parameters_array_list(size=max_len)
+    main_list_2 = split_parameters_array_list(size=max_len)
+    main_list_3 = split_parameters_array_list(size=max_len)
+    
+    
+    
+    for index, param_pack_1 in enumerate(product(d_1_vec_1_, alpha_1eef_vec_)):
+        SETUP_1 = setup_1
+        SETUP_1.d_1 = Q(param_pack_1[0], 'm')
+        SETUP_1.alpha_1eef = Q(param_pack_1[1], 'deg')
         
-        def set_row(self, i, rho_k, d_1, d_next, alpha_1eef, Z, Z_new, q_t, Delta_H, H_ave, l_11, d_k, theta):
-            self.rho_k[i] = rho_k
-            self.d_1[i] = d_1
-            self.d_next[i] = d_next 
-            self.alpha_1eef[i] = alpha_1eef
-            self.Z[i] = Z
-            self.Z_new[i] = Z_new
-            self.q_t[i] = q_t
-            self.Delta_H[i] = Delta_H
-            self.H_ave[i] = H_ave
-            self.l_11[i] = l_11 
-            self.d_k[i] = d_k
-            self.theta[i] = theta  
+        SPLIT_1 = HPC_SPLIT_2(setup=SETUP_1)
+        
+        print('thread: {}; d_1: {}/{}'.format(thread_number, index, pr_number))
+        # if split_1 is ok -> calculate split_2
+        if SPLIT_1.isOK():
+            # get d_k for split_1 (must be rounded)
+            d_k_1 = round(SPLIT_1.get_d_k(), accurancy)
+            
+            # start of diameter arange for split 2 (must be rounded)
+            d_start_2 = round(SPLIT_1.get_next_d(), accurancy)
+
+            # arange of diameter values for split 2
+            d_2_vec_2_ = np.arange(
+                d_start_2,              # start from next_d (from split_1)
+                d_start_2 + d_step + d_step * delta_d_2,  # end with previus value plus delta from input parameters
+                d_step                  # which step to take between values of diameter
+            )
+            # print(d_2_vec_2_)
+            
+            for param_pack_2 in product(d_2_vec_2_, alpha_1eef_vec_):
+                SETUP_2 = setup_2
+                SETUP_2.d_1 = Q(param_pack_2[0], 'm')
+                SETUP_2.alpha_1eef = Q(param_pack_2[1], 'deg')
+        
+                SPLIT_2 = HPC_SPLIT_2(setup=SETUP_2)
+                # if split_2 is ok
+                if SPLIT_2.isOK():
+                    # get d_k for split_2 (must be rounded)
+                    d_k_2 = round(SPLIT_2.get_d_k(), accurancy)
+                    
+                    # if diameter is increasing -> calculate split_3
+                    if d_k_1 <= d_k_2:
+                        
+                        # diameter start of arange for split_3 (must be rounded)
+                        d_start_3 = round(SPLIT_2.get_next_d(), accurancy)
+                        
+                        # arange of diameter values for split 3
+                        d_2_vec_3_ = np.arange(
+                            d_start_3,              # start from next_d (from split_2)
+                            d_start_3 + d_step + d_step * delta_d_3,  # end with previus value plus delta from input parameters
+                            d_step                  # which step to take between values of diameter
+                        )
+                        
+                        for param_pack_3 in product(d_2_vec_3_, alpha_1eef_vec_):
+                            SETUP_3 = setup_3
+                            SETUP_3.d_1 = Q(param_pack_3[0], 'm')
+                            SETUP_3.alpha_1eef = Q(param_pack_3[1], 'deg')
+        
+                            SPLIT_3 = HPC_SPLIT_2(setup=SETUP_3)
+
+                            # if split_3 is ok:
+                            if SPLIT_3.isOK():
+                                # d_k in split_3
+                                d_k_3 = round(SPLIT_3.get_d_k(), accurancy)
+                                
+                                # if diameter is increasing -> NICE
+                                if d_k_2 <= d_k_3:
+                                    main_list_1.set_row_by_split(split=SPLIT_1, isOK=1, isd_kOK=1)
+                                    main_list_2.set_row_by_split(split=SPLIT_2, isOK=1, isd_kOK=1)
+                                    main_list_3.set_row_by_split(split=SPLIT_3, isOK=1, isd_kOK=1)
+                                
+                                # if diameter is not incresing from split_2 to split_3
+                                else:
+                                    # continue
+                                    main_list_1.set_row_by_split(split=SPLIT_1, isOK=1, isd_kOK=1)
+                                    main_list_2.set_row_by_split(split=SPLIT_2, isOK=1, isd_kOK=1)
+                                    main_list_3.set_row_by_split(split=SPLIT_3, isOK=1, isd_kOK=0)
+                            # if split_3 is not ok:
+                            else:
+                                # continue
+                                main_list_1.set_row_by_split(split=SPLIT_1, isOK=1, isd_kOK=1)
+                                main_list_2.set_row_by_split(split=SPLIT_2, isOK=1, isd_kOK=1)
+                                main_list_3.set_row_by_split(split=SPLIT_3, isOK=0, isd_kOK=-1)
+                        
+                    # if diameter is not increasing from split_1 to split_2:
+                    else:
+                        # continue 
+                        main_list_1.set_row_by_split(split=SPLIT_1, isOK=1, isd_kOK=1)
+                        main_list_2.set_row_by_split(split=SPLIT_2, isOK=1, isd_kOK=0)
+                        main_list_3.set_row_by_split(split=SPLIT_1, isOK=-1, isd_kOK=-1)
+                    
+                # if split_2 is not ok:
+                else:
+                    # continue
+                    main_list_1.set_row_by_split(split=SPLIT_1, isOK=1, isd_kOK=1)
+                    main_list_2.set_row_by_split(split=SPLIT_2, isOK=0, isd_kOK=-1)
+                    main_list_3.set_row_by_split(split=SPLIT_1, isOK=-1, isd_kOK=-1)
+            
+        # if split_1 is not ok            
+        else:
+            continue
+            # main_list_1.set_row_by_split(split=SPLIT_1, isOK=0, isd_kOK=1)
+            # main_list_2.set_row_by_split(split=SPLIT_1, isOK=-1, isd_kOK=-1)
+            # main_list_3.set_row_by_split(split=SPLIT_1, isOK=-1, isd_kOK=-1)
+        
+    out_df = pd.DataFrame({
+        'n':            setup_1.n.m, 
+         
+        'isOK_1':       main_list_1.isOK,
+        'is_d_k_OK_1':  main_list_1.is_d_k_OK,
+        'rho_k_1':      main_list_1.rho_k,
+        'd_1_1':        main_list_1.d_1,
+        'd_next_1':     main_list_1.d_next,
+        'alpha_1eef_1': main_list_1.alpha_1eef,
+        'Z_1':          main_list_1.Z,
+        'Z_new_1':      main_list_1.Z_new,
+        'Z_ratio_1':    main_list_1.Z_new / main_list_1.Z,
+        'q_t_1':        main_list_1.q_t,
+        'Delta_H_1':    main_list_1.Delta_H,
+        'H_ave_1':      main_list_1.H_ave,
+        'l_11_1':       main_list_1.l_11,
+        'd_k_1':        main_list_1.d_k,
+        'theta_1':      main_list_1.theta,
+        
+        'isOK_2':       main_list_2.isOK,
+        'is_d_k_OK_2':  main_list_2.is_d_k_OK,
+        'rho_k_2':      main_list_2.rho_k,
+        'd_1_2':        main_list_2.d_1,
+        'd_next_2':     main_list_2.d_next,
+        'alpha_1eef_2': main_list_2.alpha_1eef,
+        'Z_2':          main_list_2.Z,
+        'Z_new_2':      main_list_2.Z_new,
+        'Z_ratio_2':    main_list_2.Z_new / main_list_2.Z,
+        'q_t_2':        main_list_2.q_t,
+        'Delta_H_2':    main_list_2.Delta_H,
+        'H_ave_2':      main_list_2.H_ave,
+        'l_11_2':       main_list_2.l_11,
+        'd_k_2':        main_list_2.d_k,
+        'theta_2':      main_list_2.theta,
+        
+        'isOK_3':       main_list_3.isOK,
+        'is_d_k_OK_3':  main_list_3.is_d_k_OK,
+        'rho_k_3':      main_list_3.rho_k,
+        'd_1_3':        main_list_3.d_1,
+        'd_next_3':     main_list_3.d_next,
+        'alpha_1eef_3': main_list_3.alpha_1eef,
+        'Z_3':          main_list_3.Z,
+        'Z_new_3':      main_list_3.Z_new,
+        'Z_ratio_3':    main_list_3.Z_new / main_list_3.Z,
+        'q_t_3':        main_list_3.q_t,
+        'Delta_H_3':    main_list_3.Delta_H,
+        'H_ave_3':      main_list_3.H_ave,
+        'l_11_3':       main_list_3.l_11,
+        'd_k_3':        main_list_3.d_k,
+        'theta_3':      main_list_3.theta, 
+    })
     
+    out_df = out_df[out_df['rho_k_1'] != 0]
     
+    out_df.to_csv(path + 'split_thread_{}.csv'.format(thread_number))
+
+
+def local_calculate_split(path,thread_number,setup_1, setup_2, setup_3, d_1_vec_1_,d_1_range_3, alpha_1eef_vec_, rho_k_vec_):
+    
+        
+                
+    max_len = len(list(product(d_1_vec_1_,alpha_1eef_vec_,rho_k_vec_))) * len(alpha_1eef_vec_) * len(list(product(alpha_1eef_vec_, 
+                    np.arange(0.5, d_1_range_3[1].m,d_1_range_3[2].m))))
+    
+    main_list_1 = split_parameters_array_list(size=max_len)
+    main_list_2 = split_parameters_array_list(size=max_len)
+    main_list_3 = split_parameters_array_list(size=max_len)
     
     for index, thing in enumerate(product(d_1_vec_1_,alpha_1eef_vec_,rho_k_vec_)):     #4
         setup_1_            = setup_1
@@ -170,10 +386,10 @@ def local_calculate_split(setup_1, setup_2, setup_3, d_1_vec_1_,d_1_range_3, alp
                 
                 if (SPLIT_2.isOK()): 
                     if (SPLIT_2.get_d_k() >= SPLIT_1.get_d_k()):
-                        for thing__ in product(
+                        for index__, thing__ in enumerate(product(
                             alpha_1eef_vec_, 
                             np.arange(round(SPLIT_2.get_next_d(), 2),d_1_range_3[1].m,d_1_range_3[2].m)
-                            ):
+                            )):
                             setup_3_            = setup_3
                             setup_3_.d_1        = Q(thing__[1], 'm') # round(SPLIT_2.get_next_d(),3) + 0
                             setup_3_.alpha_1eef = Q(thing__[0], 'deg')
@@ -184,61 +400,170 @@ def local_calculate_split(setup_1, setup_2, setup_3, d_1_vec_1_,d_1_range_3, alp
                             if (SPLIT_3.isOK()):
                                 if (SPLIT_3.get_d_k() >= SPLIT_2.get_d_k()):
                                     print('DONE')
-                                    GLOBAL_DF = pd.concat([GLOBAL_DF, 
-                                                           pd.DataFrame.from_dict(
-                                    {
-                                    'n':            setup_1_.n.m, 
-                                    'rho_k':        setup_1_.rho_k.m, 
-                                   
-                                    'd_1_1':        SPLIT_1.get_d_1(),
-                                    'd_next_1':     SPLIT_1.get_next_d(),
-                                    'alpha_1eef_1': setup_1_.alpha_1eef.m,
-                                    'Z_1':          SPLIT_1.get_Z(),
-                                    'Z_new_1':      SPLIT_1.get_Z_new(),
-                                    'Z_ratio_1':    SPLIT_1.get_Z_new()/SPLIT_1.get_Z(),
-                                    'q_t_1':        SPLIT_1.get_q_t(),
-                                    'Delta_H_1':    SPLIT_1.get_Delta_H(),
-                                    'H_ave_1':      SPLIT_1.get_H_0ave(),
-                                    'l_11_1':       SPLIT_1.get_l_11(),
-                                    'd_k_1':        SPLIT_1.get_d_k(),
-                                    'theta_1':      SPLIT_1.get_last_theta(),
+                                    main_list_1.set_row(isOK=True, is_d_k_OK=True,
+                                                        rho_k=setup_1_.rho_k.m, d_1=SPLIT_1.get_d_1(), d_next=SPLIT_1.get_next_d(), 
+                                                        alpha_1eef = setup_1_.alpha_1eef.m, Z=SPLIT_1.get_Z(), Z_new = SPLIT_1.get_Z_new(), 
+                                                        q_t=SPLIT_1.get_q_t(), Delta_H=SPLIT_1.get_Delta_H(), H_ave=SPLIT_1.get_H_0ave(), 
+                                                        l_11=SPLIT_1.get_l_11(), d_k=SPLIT_1.get_d_k(), theta=SPLIT_1.get_last_theta())
                                     
-                                    'd_1_2':        SPLIT_2.get_d_1(), 
-                                    'd_next_2':     SPLIT_2.get_next_d(),
-                                    'alpha_1eef_2': setup_2_.alpha_1eef.m,
-                                    'Z_2':          SPLIT_2.get_Z(),
-                                    'Z_new_2':      SPLIT_2.get_Z_new(),
-                                    'Z_ratio_2':    SPLIT_2.get_Z_new()/SPLIT_2.get_Z(),
-                                    'q_t_2':        SPLIT_2.get_q_t(),
-                                    'Delta_H_2':    SPLIT_2.get_Delta_H(),
-                                    'H_ave_2':      SPLIT_2.get_H_0ave(),
-                                    'l_11_2':       SPLIT_2.get_l_11(),
-                                    'd_k_2':        SPLIT_2.get_d_k(),
-                                    'theta_2':      SPLIT_2.get_last_theta(),
-
-                                    'd_1_3':        SPLIT_3.get_d_1(), 
-                                    'd_next_3':     SPLIT_3.get_next_d(),
-                                    'alpha_1eef_3': setup_3_.alpha_1eef.m,
-                                    'Z_3':          SPLIT_3.get_Z(),
-                                    'Z_new_3':      SPLIT_3.get_Z_new(),
-                                    'Z_ratio_3':    SPLIT_3.get_Z_new()/SPLIT_3.get_Z(),
-                                    'q_t_3':        SPLIT_3.get_q_t(),
-                                    'Delta_H_3':    SPLIT_3.get_Delta_H(),
-                                    'H_ave_3':      SPLIT_3.get_H_0ave(),
-                                    'l_11_3':       SPLIT_3.get_l_11(),
-                                    'd_k_3':        SPLIT_3.get_d_k(),
-                                    'theta_3':      SPLIT_3.get_last_theta()
-                                    })],ignore_index=True)
+                                    main_list_2.set_row(isOK=True, is_d_k_OK=True,
+                                                        rho_k=setup_2_.rho_k.m, d_1=SPLIT_2.get_d_1(), d_next=SPLIT_2.get_next_d(), 
+                                                        alpha_1eef = setup_2_.alpha_1eef.m, Z=SPLIT_2.get_Z(), Z_new = SPLIT_2.get_Z_new(), 
+                                                        q_t=SPLIT_2.get_q_t(), Delta_H=SPLIT_2.get_Delta_H(), H_ave=SPLIT_2.get_H_0ave(), 
+                                                        l_11=SPLIT_2.get_l_11(), d_k=SPLIT_2.get_d_k(), theta=SPLIT_2.get_last_theta())
+                                    
+                                    main_list_3.set_row(isOK=True, is_d_k_OK=True,
+                                                        rho_k=setup_3_.rho_k.m, d_1=SPLIT_3.get_d_1(), d_next=SPLIT_3.get_next_d(), 
+                                                        alpha_1eef = setup_3_.alpha_1eef.m, Z=SPLIT_3.get_Z(), Z_new = SPLIT_3.get_Z_new(), 
+                                                        q_t=SPLIT_3.get_q_t(), Delta_H=SPLIT_3.get_Delta_H(), H_ave=SPLIT_3.get_H_0ave(), 
+                                                        l_11=SPLIT_3.get_l_11(), d_k=SPLIT_3.get_d_k(), theta=SPLIT_3.get_last_theta())
                                 else:
+                                    main_list_1.set_row(isOK=True, is_d_k_OK=True,
+                                                        rho_k=setup_1_.rho_k.m, d_1=SPLIT_1.get_d_1(), d_next=SPLIT_1.get_next_d(), 
+                                                        alpha_1eef = setup_1_.alpha_1eef.m, Z=SPLIT_1.get_Z(), Z_new = SPLIT_1.get_Z_new(), 
+                                                        q_t=SPLIT_1.get_q_t(), Delta_H=SPLIT_1.get_Delta_H(), H_ave=SPLIT_1.get_H_0ave(), 
+                                                        l_11=SPLIT_1.get_l_11(), d_k=SPLIT_1.get_d_k(), theta=SPLIT_1.get_last_theta())
+                                    
+                                    main_list_2.set_row(isOK=True, is_d_k_OK=True,
+                                                        rho_k=setup_2_.rho_k.m, d_1=SPLIT_2.get_d_1(), d_next=SPLIT_2.get_next_d(), 
+                                                        alpha_1eef = setup_2_.alpha_1eef.m, Z=SPLIT_2.get_Z(), Z_new = SPLIT_2.get_Z_new(), 
+                                                        q_t=SPLIT_2.get_q_t(), Delta_H=SPLIT_2.get_Delta_H(), H_ave=SPLIT_2.get_H_0ave(), 
+                                                        l_11=SPLIT_2.get_l_11(), d_k=SPLIT_2.get_d_k(), theta=SPLIT_2.get_last_theta())
+                                    
+                                    main_list_3.set_row(isOK=True, is_d_k_OK=False,
+                                                        rho_k=setup_3_.rho_k.m, d_1=SPLIT_3.get_d_1(), d_next=SPLIT_3.get_next_d(), 
+                                                        alpha_1eef = setup_3_.alpha_1eef.m, Z=SPLIT_3.get_Z(), Z_new = SPLIT_3.get_Z_new(), 
+                                                        q_t=SPLIT_3.get_q_t(), Delta_H=SPLIT_3.get_Delta_H(), H_ave=SPLIT_3.get_H_0ave(), 
+                                                        l_11=SPLIT_3.get_l_11(), d_k=SPLIT_3.get_d_k(), theta=SPLIT_3.get_last_theta())
                                     continue   
                             else:
+                                main_list_1.set_row(isOK=True, is_d_k_OK=True,
+                                                    rho_k=setup_1_.rho_k.m, d_1=SPLIT_1.get_d_1(), d_next=SPLIT_1.get_next_d(), 
+                                                    alpha_1eef = setup_1_.alpha_1eef.m, Z=SPLIT_1.get_Z(), Z_new = SPLIT_1.get_Z_new(), 
+                                                    q_t=SPLIT_1.get_q_t(), Delta_H=SPLIT_1.get_Delta_H(), H_ave=SPLIT_1.get_H_0ave(), 
+                                                    l_11=SPLIT_1.get_l_11(), d_k=SPLIT_1.get_d_k(), theta=SPLIT_1.get_last_theta())
+                                    
+                                main_list_2.set_row(isOK=True, is_d_k_OK=False,
+                                                    rho_k=setup_2_.rho_k.m, d_1=SPLIT_2.get_d_1(), d_next=SPLIT_2.get_next_d(), 
+                                                    alpha_1eef = setup_2_.alpha_1eef.m, Z=SPLIT_2.get_Z(), Z_new = SPLIT_2.get_Z_new(), 
+                                                    q_t=SPLIT_2.get_q_t(), Delta_H=SPLIT_2.get_Delta_H(), H_ave=SPLIT_2.get_H_0ave(), 
+                                                    l_11=SPLIT_2.get_l_11(), d_k=SPLIT_2.get_d_k(), theta=SPLIT_2.get_last_theta())
+                                    
+                                main_list_3.set_row(isOK=False, is_d_k_OK=-1,
+                                                    d_1 = setup_3_.d_1.m,
+                                                    rho_k=setup_3_.rho_k.m, alpha_1eef = setup_3_.alpha_1eef.m)
                                 continue
                     else:
+                        main_list_1.set_row(isOK=True, is_d_k_OK=True,
+                                            rho_k=setup_1_.rho_k.m, d_1=SPLIT_1.get_d_1(), d_next=SPLIT_1.get_next_d(), 
+                                            alpha_1eef = setup_1_.alpha_1eef.m, Z=SPLIT_1.get_Z(), Z_new = SPLIT_1.get_Z_new(), 
+                                            q_t=SPLIT_1.get_q_t(), Delta_H=SPLIT_1.get_Delta_H(), H_ave=SPLIT_1.get_H_0ave(), 
+                                            l_11=SPLIT_1.get_l_11(), d_k=SPLIT_1.get_d_k(), theta=SPLIT_1.get_last_theta())
+                                    
+                        main_list_2.set_row(isOK=True, is_d_k_OK=False,
+                                            rho_k=setup_2_.rho_k.m, d_1=SPLIT_2.get_d_1(), d_next=SPLIT_2.get_next_d(), 
+                                            alpha_1eef = setup_1_.alpha_1eef.m, Z=SPLIT_2.get_Z(), Z_new = SPLIT_2.get_Z_new(), 
+                                            q_t=SPLIT_2.get_q_t(), Delta_H=SPLIT_2.get_Delta_H(), H_ave=SPLIT_2.get_H_0ave(), 
+                                            l_11=SPLIT_2.get_l_11(), d_k=SPLIT_2.get_d_k(), theta=SPLIT_2.get_last_theta())
+                                    
+                        main_list_3.set_row(isOK=-1, is_d_k_OK=-1,
+                                            rho_k=-1,#setup_3_.rho_k.m,
+                                            alpha_1eef =-1)# setup_3_.alpha_1eef.m)
                         continue
                 else:
+                    main_list_1.set_row(isOK=True, is_d_k_OK=True,
+                                        rho_k=setup_1_.rho_k.m, d_1=SPLIT_1.get_d_1(), d_next=SPLIT_1.get_next_d(), 
+                                        alpha_1eef = setup_1_.alpha_1eef.m, Z=SPLIT_1.get_Z(), Z_new = SPLIT_1.get_Z_new(), 
+                                        q_t=SPLIT_1.get_q_t(), Delta_H=SPLIT_1.get_Delta_H(), H_ave=SPLIT_1.get_H_0ave(), 
+                                        l_11=SPLIT_1.get_l_11(), d_k=SPLIT_1.get_d_k(), theta=SPLIT_1.get_last_theta())
+                                    
+                    main_list_2.set_row(isOK=False, is_d_k_OK=-1,
+                                        d_1 = setup_2_.d_1.m,
+                                        rho_k=setup_2_.rho_k.m, 
+                                        alpha_1eef = setup_2_.alpha_1eef.m)
+                                    
+                    main_list_3.set_row(isOK=-1, is_d_k_OK=-1,
+                                        rho_k=-1,#setup_3_.rho_k.m,
+                                        alpha_1eef = -1)#setup_3_.alpha_1eef.m)
                     continue    
-   
+        else:
+            main_list_1.set_row(isOK=False, is_d_k_OK=True,
+                                d_1 = setup_1_.d_1.m,
+                                rho_k=setup_1_.rho_k.m, 
+                                alpha_1eef = setup_1_.alpha_1eef.m)
+                                    
+            main_list_2.set_row(isOK=-1, is_d_k_OK=-1,
+                                rho_k=-1,#setup_2_.rho_k.m, 
+                                alpha_1eef = -1)
+                                    
+            main_list_3.set_row(isOK=-1, is_d_k_OK=-1,
+                                rho_k=-1,#setup_3_.rho_k.m,
+                                alpha_1eef = -1)# setup_3_.alpha_1eef.m)
+            continue
     
+    out_df = pd.DataFrame({
+        'n':            setup_1_.n.m, 
+         
+        'isOK_1':       main_list_1.isOK,
+        'is_d_k_OK_1':  main_list_1.is_d_k_OK,
+        'rho_k_1':      main_list_1.rho_k,
+        'd_1_1':        main_list_1.d_1,
+        'd_next_1':     main_list_1.d_next,
+        'alpha_1eef_1': main_list_1.alpha_1eef,
+        'Z_1':          main_list_1.Z,
+        'Z_new_1':      main_list_1.Z_new,
+        'Z_ratio_1':    main_list_1.Z_new / main_list_1.Z,
+        'q_t_1':        main_list_1.q_t,
+        'Delta_H_1':    main_list_1.Delta_H,
+        'H_ave_1':      main_list_1.H_ave,
+        'l_11_1':       main_list_1.l_11,
+        'd_k_1':        main_list_1.d_k,
+        'theta_1':      main_list_1.theta,
+        
+        'isOK_2':       main_list_2.isOK,
+        'is_d_k_OK_2':  main_list_2.is_d_k_OK,
+        'rho_k_2':      main_list_2.rho_k,
+        'd_1_2':        main_list_2.d_1,
+        'd_next_2':     main_list_2.d_next,
+        'alpha_1eef_2': main_list_2.alpha_1eef,
+        'Z_2':          main_list_2.Z,
+        'Z_new_2':      main_list_2.Z_new,
+        'Z_ratio_2':    main_list_2.Z_new / main_list_2.Z,
+        'q_t_2':        main_list_2.q_t,
+        'Delta_H_2':    main_list_2.Delta_H,
+        'H_ave_2':      main_list_2.H_ave,
+        'l_11_2':       main_list_2.l_11,
+        'd_k_2':        main_list_2.d_k,
+        'theta_2':      main_list_2.theta,
+        
+        'isOK_3':       main_list_3.isOK,
+        'is_d_k_OK_3':  main_list_3.is_d_k_OK,
+        'rho_k_3':      main_list_3.rho_k,
+        'd_1_3':        main_list_3.d_1,
+        'd_next_3':     main_list_3.d_next,
+        'alpha_1eef_3': main_list_3.alpha_1eef,
+        'Z_3':          main_list_3.Z,
+        'Z_new_3':      main_list_3.Z_new,
+        'Z_ratio_3':    main_list_3.Z_new / main_list_3.Z,
+        'q_t_3':        main_list_3.q_t,
+        'Delta_H_3':    main_list_3.Delta_H,
+        'H_ave_3':      main_list_3.H_ave,
+        'l_11_3':       main_list_3.l_11,
+        'd_k_3':        main_list_3.d_k,
+        'theta_3':      main_list_3.theta, 
+    })
+    
+    out_df = out_df[out_df['rho_k_1'] != 0]
+    
+    out_df.to_csv(path + 'split_thread_{}.csv'.format(thread_number))
+    #print(out_df)
+    
+    
+    #GLOBAL_DF2 = pd.concat([GLOBAL_DF2, out_df], ignore_index=True)
+    
+    # print(GLOBAL_DF2)
+    
+    #return out_df
     #GLOBAL_DF = pd.concat([local_df])
     
     #print(GLOBAL_DF)
@@ -249,62 +574,168 @@ def local_calculate_split(setup_1, setup_2, setup_3, d_1_vec_1_,d_1_range_3, alp
     
     #return GLOBAL_DF
 
-
+def HPC_SPLOT_SAME_PARAM_RANGES_FAST_SMART(
+    setup_1:HPC_SPLIT_SETUP,
+    setup_2:HPC_SPLIT_SETUP,
+    setup_3:HPC_SPLIT_SETUP,
+    thread_number,
+    path = '',
+    rho_k = 0.07,
+    alpha_1eef_range = [9, 30, 1],
+    d_start_1 = 0.5,
+    delta_d_1 = 3,
+    delta_d_2 = 3,
+    delta_d_3 = 3,
+    step = 0.05,
+    accurancy = 2,
+):
+    
+    alpha_1eef_vec = np.arange(*alpha_1eef_range)
+      
+    d_1_vec_1_ = np.arange(d_start_1, d_start_1 + step * delta_d_1 + step, step)
+    
+    d_splits = np.array_split(d_1_vec_1_, thread_number)
+    
+    #local_calculate_split(setup_1, setup_2, setup_3, d_splits[0], d_1_range_3, alpha_1eef_vec_, rho_k_vec_)
+    
+    threads = []
+    
+    # path,thread_number,
+    # setup_1:HPC_SPLIT_SETUP, setup_2:HPC_SPLIT_SETUP, setup_3:HPC_SPLIT_SETUP, 
+    # d_start_1, alpha_1eef_vec_, rho_k, 
+    # delta_d_1, delta_d_2, delta_d_3, 
+    # accurancy = 2, d_step = 0.5
+    
+    # local_calculate_split_smart(path, 0, setup_1, setup_2, setup_3,
+    #                        d_splits[0], alpha_1eef_vec, rho_k,
+    #                        delta_d_2, delta_d_3,
+    #                        accurancy, step)
+    
+    for i in range(0, thread_number):
+        threads.append(
+            Thread(target = local_calculate_split_smart,
+                   args = (path, i,
+                           setup_1, setup_2, setup_3,
+                           d_splits[i], alpha_1eef_vec, rho_k,
+                           delta_d_2, delta_d_3,
+                           accurancy, step)
+            )
+        )
+    
+    # threads start
+    for i in range(0, thread_number):
+        threads[i].start()
+    
+    # threads join
+    for i in range(0, thread_number):
+        threads[i].join()
+    
+    global GLOBAL_DF2
+    
+    dfs = GLOBAL_DF2
+    dfs_list = []
+    # combine dataframes together
+    for i in range(0, thread_number):
+        dfs_list.append(
+            pd.read_csv(path + 'split_thread_{}.csv'.format(i))
+        )
+        
+        
+    dfs = pd.concat([dfs, *dfs_list], ignore_index=True)
+    
+    now = datetime.now()
+    date_time = str(now.strftime("%d_%m_%H_%M_%S"))
+    
+    # print("path: ", )
+    dfs.to_csv(path + 'split_thread_{}.csv'.format(date_time))    
+    
+    
+    for i in range(0, thread_number):
+        os.remove(path + 'split_thread_{}.csv'.format(i))
+    
+    return True
 
 def HPC_SPLIT_SAME_PARAM_RANGES_FAST(
     setup_1:HPC_SPLIT_SETUP,
     setup_2:HPC_SPLIT_SETUP,
     setup_3:HPC_SPLIT_SETUP,
+    path = '',
+    thread_number = 3,
     d_1_range_1 = Q([0.6, 1.4, 0.1], 'm'), 
     d_1_range_3 = Q([0.6, 1.4, 0.1], 'm'),
     alpha_1eef_range = Q([9, 16, 1], 'deg'),
     rho_k_range = Q([0.03, 0.07, 0.01], "" )
 ):
-    if (isinstance(d_1_range_1,pint.Quantity)):           d_1_vec_1_ = np.arange(*(d_1_range_1.m))
+    if path == '':return False
+    
+    if (isinstance(d_1_range_1,pint.Quantity)):         d_1_vec_1_ = np.arange(*(d_1_range_1.m))
     else:                                               d_1_vec_1_ = np.arange(*(d_1_range_1))
 
+    
+    
     if (isinstance(alpha_1eef_range, pint.Quantity)):   alpha_1eef_vec_ = np.arange(*(alpha_1eef_range.m))
     else:                                               alpha_1eef_vec_ = np.arange(*(alpha_1eef_range))
 
     if (isinstance(rho_k_range, pint.Quantity)):        rho_k_vec_ = np.arange(*(rho_k_range.m))
     else:                                               rho_k_vec_ = np.arange(*(rho_k_range))
 
-    d_splits = np.array_split(d_1_vec_1_, 6)
+    d_splits = np.array_split(d_1_vec_1_, thread_number)
+    
+    #local_calculate_split(setup_1, setup_2, setup_3, d_splits[0], d_1_range_3, alpha_1eef_vec_, rho_k_vec_)
+    
+    threads = []
+    
+    for i in range(0, thread_number):
+        threads.append(
+            Thread(target = local_calculate_split,
+                   args = (
+                       path,
+                       i,
+                       setup_1, 
+                       setup_2, 
+                       setup_3, 
+                       d_splits[i], 
+                       d_1_range_3, 
+                       alpha_1eef_vec_, 
+                       rho_k_vec_
+                   )
+            )
+        )
+    
+    # threads start
+    for i in range(0, thread_number):
+        threads[i].start()
+    
+    # threads join
+    for i in range(0, thread_number):
+        threads[i].join()
+    
+    global GLOBAL_DF2
+    
+    dfs = GLOBAL_DF2
+    dfs_list = []
+    # combine dataframes together
+    for i in range(0, thread_number):
+        dfs_list.append(
+            pd.read_csv(path + 'split_thread_{}.csv'.format(i))
+        )
+        
+        
+    dfs = pd.concat([dfs, *dfs_list], ignore_index=True)
+    
+    now = datetime.now()
+    date_time = str(now.strftime("%d_%m_%H_%M_%S"))
+    
+    # print("path: ", )
+    dfs.to_csv(path + 'split_thread_{}.csv'.format(date_time))    
     
     
-    t1 = Thread(target= local_calculate_split, args = (setup_1, setup_2, setup_3, d_splits[0], d_1_range_3, alpha_1eef_vec_, rho_k_vec_))
+    for i in range(0, thread_number):
+        os.remove(path + 'split_thread_{}.csv'.format(i))
     
-    t2 = Thread(target= local_calculate_split, args = (setup_1, setup_2, setup_3, d_splits[1], d_1_range_3, alpha_1eef_vec_, rho_k_vec_))
-    
-    t3 = Thread(target= local_calculate_split, args = (setup_1, setup_2, setup_3, d_splits[2], d_1_range_3, alpha_1eef_vec_, rho_k_vec_))
-    
-    t4 = Thread(target= local_calculate_split, args = (setup_1, setup_2, setup_3, d_splits[3], d_1_range_3, alpha_1eef_vec_, rho_k_vec_))
-    
-    t5 = Thread(target= local_calculate_split, args = (setup_1, setup_2, setup_3, d_splits[4], d_1_range_3, alpha_1eef_vec_, rho_k_vec_))
-    
-    t6 = Thread(target= local_calculate_split, args = (setup_1, setup_2, setup_3, d_splits[5], d_1_range_3, alpha_1eef_vec_, rho_k_vec_))
-    
-    # local_calculate_split(setup_1=setup_1,setup_2=setup_2,setup_3=setup_3,d_1_vec_1_=d_splits[0],alpha_1eef_vec_=alpha_1eef_vec_,rho_k_vec_=rho_k_vec_,d_1_range_3=d_1_range_3)
-    t1.start()
-    t2.start()
-    t3.start()
-    t4.start()
-    t5.start()
-    t6.start()
-    
-    t1.join()
-    t2.join()
-    t3.join()
-    t4.join()
-    t5.join()
-    t6.join()
-    
+    return True
     #GLOBAL_DF = pd.concat([df1, df2, df3], ignore_index=True)
     
-    
-    
-    
-
 def HPC_SPLIT_SAME_PARAM_RANGES(
     setup_1:HPC_SPLIT_SETUP,
     setup_2:HPC_SPLIT_SETUP,
@@ -1233,7 +1664,100 @@ class HPC_SPLIT_2:
     def get_Z_new(self):                return self.__Z_new          
     def get_Delta_H(self):              return self.__Delta_H       
     def get_H_new_vec(self):            return self.__H_new_vec      
+    def get_rho_k(self):                return self.__rho_k
+    def get_alpha_1eef(self):           return self.__alpha_1eef
     
+class split_parameters_array_list:
+    def __init__(self, size):
+        self.rho_k = np.zeros(size)    
+        self.d_1 = np.zeros(size)
+        self.d_next = np.zeros(size)
+        self.alpha_1eef = np.zeros(size)
+        self.Z = np.zeros(size)
+        self.Z_new = np.zeros(size)
+        # self.Z_ratio = np.zeros(size)
+        self.q_t = np.zeros(size)
+        self.Delta_H = np.zeros(size)
+        self.H_ave = np.zeros(size)
+        self.l_11 = np.zeros(size)
+        self.d_k = np.zeros(size)
+        self.theta = np.zeros(size)
+        self.isOK = np.ones(size, dtype=int)
+        self.is_d_k_OK = np.ones(size, dtype=int)
+        self.__last_it = 0
+        
+    def set_row(self, isOK, is_d_k_OK, rho_k=-1, d_1=-1, d_next=-1, alpha_1eef=-1, Z=-1, Z_new=-1, q_t=-1, Delta_H=-1, H_ave=-1, l_11=-1, d_k=-1, theta=-1):
+        i = self.__last_it
+        
+        if not(isOK): self.isOK[i] = False
+            
+        if not(is_d_k_OK):self.is_d_k_OK[i] = False
+                
+        self.rho_k[i] = rho_k
+        self.d_1[i] = d_1
+        self.d_next[i] = d_next 
+        self.alpha_1eef[i] = alpha_1eef
+        self.Z[i] = Z
+        self.Z_new[i] = Z_new
+        self.q_t[i] = q_t
+        self.Delta_H[i] = Delta_H
+        self.H_ave[i] = H_ave
+        self.l_11[i] = l_11 
+        self.d_k[i] = d_k
+        self.theta[i] = theta
+        self.__last_it += 1
+
+    def set_row_by_split(self, split, isOK, isd_kOK):
+        i = self.__last_it
+        
+        
+        self.isOK[i] = isOK
+        self.is_d_k_OK[i] = isd_kOK
+        
+        if split == -1:
+            self.rho_k[i] = -1
+            self.d_1[i] = -1
+            self.alpha_1eef[i] = -1
+            self.d_next[i] = -1
+            self.Z[i] = -1
+            self.Z_new[i] = -1
+            self.q_t[i] = -1
+            self.Delta_H[i] = -1
+            self.H_ave[i] = -1
+            self.l_11[i] = -1
+            self.d_k[i] = -1
+            self.theta[i] = -1
+            
+            self.__last_it += 1
+            return
+        
+        self.rho_k[i] = split.get_rho_k()
+        self.d_1[i] = split.get_d_1()
+        self.alpha_1eef[i] = split.get_alpha_1eef()
+        
+        if isOK == 1:
+            self.d_next[i] = split.get_next_d() 
+            self.Z[i] = split.get_Z()
+            self.Z_new[i] = split.get_Z_new()
+            self.q_t[i] = split.get_q_t()
+            self.Delta_H[i] = split.get_Delta_H()
+            self.H_ave[i] = split.get_H_0ave()
+            self.l_11[i] = split.get_l_11() 
+            self.d_k[i] = split.get_d_k()
+            self.theta[i] = split.get_last_theta()
+        else:
+            self.d_next[i] = -1
+            self.Z[i] = -1
+            self.Z_new[i] = -1
+            self.q_t[i] = -1
+            self.Delta_H[i] = -1
+            self.H_ave[i] = -1
+            self.l_11[i] = -1
+            self.d_k[i] = -1
+            self.theta[i] = -1
+        
+        self.__last_it += 1
+
 class HPC_SPLIT:
     def __init__(
         self,                       # Давление свежего пара                                |
@@ -1848,14 +2372,6 @@ def calculate_hpc_split_in_ranges(
     #print(number_of_d_1)
 
 
-'''
-\begin{tabbing}
-    \hspace{l} \= MMMM \= MMMM \kill
-    #1\>abc\>dddd\\
-    #2\>abc\>dddd\\
-    #3\>abc\>dddd\\
-\end{tabbing}
-'''
 
 from io import open
 def save_split_data_in_tex(d_1,  rho_k_vec, alpha_1eef_vec, Z_vec):
