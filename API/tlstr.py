@@ -1,6 +1,9 @@
 import pint
 import numpy as np
 
+from . import ThPoint
+# from . import Stage
+
 class tlstr(str):
     
     # классическая версия str.format с изменением замены {} на [] и без поддержки [1] [2]
@@ -35,6 +38,16 @@ class tlstr(str):
             # if 0,1 : 0.00, .0
             
         '''    
+        if not(isinstance(value, (float, int))):
+            return value
+        
+        elif isinstance(value, ThPoint):
+            return value
+        elif value is None:
+            return value
+        elif isinstance(value, str):
+            return value
+        
         
         dot_pos = tlstr(value).find(".")
         
@@ -163,21 +176,33 @@ class tlstr(str):
         return self.format_comment(*tuple(_args), **dict(_kwargs))
 
         
-    def dformat(self, inlist=[],*args, **kwargs):
+    def dformat(self, inlist=[],mode=0,*args, **kwargs):
         '''
             Версия tlstr.format(...) с поддержкой единиц измерения с использоваением округления
         '''
         
         _list = list()
         for i in inlist:
-            if (type(i) == np.ndarray):
+            if (type(i[1]) == np.ndarray):
                 continue
+            if (type(i[1]) == ThPoint):
+                continue
+            if (type(i[1]) == bool):
+                continue
+            # if (type(i[1]) == None):
+            #     continue
+            # if (type(i[1]) == str):
+            #     _list.append((i[0], i[1]))
+            #     continue
             if (isinstance(i[1], pint.Quantity)):
                 if (type(i[1].m) == np.ndarray):
                     continue
                 _list.append((i[0], self.__correct_round(i[1].m, ALIGN_MODE=0)))
             else:
-                _list.append((i[0], i[1]))  
+                if not mode:
+                    _list.append((i[0], i[1]))
+                else:
+                    _list.append((i[0], self.__correct_round(i[1], ALIGN_MODE=0)))
         
         _args = list()
         for i in args:
@@ -196,7 +221,10 @@ class tlstr(str):
                     continue
                 _kwargs.append((i[0], self.__correct_round(i[1].m, ALIGN_MODE=0)))
             else:
-                _kwargs.append((i[0], i[1]))  
+                if not mode:
+                    _list.append((i[0], i[1]))
+                else:
+                    _list.append((i[0], self.__correct_round(i[1], ALIGN_MODE=0)))  
                 
         return self.format(*tuple(_args), **dict(_kwargs), **dict(_list))
     

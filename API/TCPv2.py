@@ -234,6 +234,22 @@ class ThPoint:
     def GetArrNoDim(self):
         return self.__Parameters.copy()
     
+    def GetNameValueDict(self, flag = DIM()):
+        return {
+            "p"   : self.p(flag),
+            "t"   : self.t(flag),
+            "rho" : self.rho(flag),
+            "v"   : self.v(flag),
+            "h"   : self.h(flag),
+            "s"   : self.s(flag),
+            "cp"  : self.cp(flag),
+            "cv"  : self.cv(flag),
+            "a"   : self.a(flag),
+            "k"   : self.k(flag),
+            "x"   : self.x(flag),
+            "kv"  : self.kv(flag)
+        }
+    
     def GetFunctionByID(self,in_f_id, in_s_id, out_id):
         # (p, t)
         if   ((in_f_id == 0) and (in_s_id == 1)):
@@ -376,7 +392,7 @@ class ThPoint:
             elif (out_id == 25): return hs2kv
         else:
             raise Exception("Invalid input thermal  __Parameters")
-        
+    
 from datetime import datetime        
 def MakeThArr(
     p:np.ndarray   = float("NaN"),

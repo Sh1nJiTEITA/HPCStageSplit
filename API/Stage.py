@@ -4,11 +4,13 @@
 import numpy as np
 import pandas as pd
 from pint import Quantity as Q
+import pathlib
+from itertools import chain
 
 # Собственные
 from . import ThPoint
 from . import calculate_losses
-
+from . import tlstr
 
 
 
@@ -222,8 +224,10 @@ class Stage:
         
         # Прочие величины ------------- # ----------------------------------------------------------------------------
         
+        self.__X            = None      # []         u/c_f
         self.__G_0 = G_0                # [кг/s]     Массовый расход в ступени
         self.__d_hub = d_hub            # [м]        Корневой диаметр 
+        self.__d            = None      # [м]        Средний диаметр 
         self.__n = n                    # [1/s]      Частота вращения вала
         self.__reaction = reaction      # []         Степень рективности ступени на среднем диаметре
         self.__kappa_vs = kappa_vs      # []         Коэффициент выходной скорости
@@ -231,12 +235,17 @@ class Stage:
         self.__vane_grid    = None      # ...        Параметры сопловой решетки
         self.__rotor_grid   = None      # ...        Параметры рабочей решетки
         
-        self.__isOK         = None      # ...        Просчитывается ли ступень
+        self.__isOK         = True      # ...        Просчитывается ли ступень
+        
+        self.__name_1       = None      # ...        Название сопловой решетки
+        self.__name_2       = None      # ...        Название сопловой решетки
         
         # Основной расчет ступени 
-        self.calculate()
-        
-    
+        try:
+            self.calculate()
+        except Exception as s:
+            self.__isOK = False
+
     
     def __calculate_full_heat_transfer(self):
         # Полный располагаемый теплоперепад на ступень
@@ -426,12 +435,12 @@ class Stage:
         
     def __find_critical_point_1(self) -> ThPoint:
         # Начальные приближения:
-        p_i = np.mean([self.__fp_0, self.__p_1])
+        # p_i = np.mean([self.__fp_0, self.__p_1])
         
         # Поиск
-        while (True):
+        for pressure in np.arange(self.__fp_0, self.__p_1, 0.001):
             # i-ая термодинамическая точка 
-            Point_i = ThPoint(p=p_i, s=self.__fs_0)
+            Point_i = ThPoint(p=pressure, s=self.__fs_0)
             # i-ая скорость звука
             a_i = Point_i.a(0)
             # i-ая энтальпия
@@ -445,19 +454,19 @@ class Stage:
             # Если число Маха М ~ 1
             if (np.abs(M_i - 1) < 0.001):
                 break
-            # Если число Маха М > 1, то необходимо увеличить промежуточное давление
-            elif M_i < 1:
-                if (np.abs(1 - M_i) > 0.100):
-                    p_i = np.mean([p_i, self.__p_1])
-                else:
-                    p_i = 0.99 * p_i
+            # # Если число Маха М > 1, то необходимо увеличить промежуточное давление
+            # elif M_i < 1:
+            #     if (np.abs(1 - M_i) > 0.100):
+            #         p_i = np.mean([p_i, self.__p_1])
+            #     else:
+            #         p_i = 0.99 * p_i
                 
-            # Если число Маха М < 1, то необходимо уменьшить промежуточное давление
-            elif M_i > 1:
-                if (np.abs(1 - M_i) > 0.100):
-                    p_i = np.mean([self.__fp_0, p_i])
-                else:
-                    p_i = 1.01 * p_i
+            # # Если число Маха М < 1, то необходимо уменьшить промежуточное давление
+            # elif M_i > 1:
+            #     if (np.abs(1 - M_i) > 0.100):
+            #         p_i = np.mean([self.__fp_0, p_i])
+            #     else:
+            #         p_i = 1.01 * p_i
         
         return Point_i
          
@@ -488,7 +497,7 @@ class Stage:
     
     def __get_critical_rotor_area_and_rotor_angles(self, psi, mu_2):
         # Поиск критической точки в сопловой решетке
-        Point_cr = self.__find_critical_point(self.__fPoint_1, self.__Point_2t)
+        Point_cr = self.__find_critical_point_1(self.__fPoint_1, self.__Point_2t)
 
         # Критический удельный объем
         v_2cr = Point_cr.v(0)
@@ -515,7 +524,7 @@ class Stage:
             Функция предназначена для расчета площади сопловой решетки и угла выхода при числе Маха М > 1.
         """ 
         # Поиск критической точки в сопловой решетке
-        Point_cr = self.__find_critical_point(self.__fPoint_0, self.__Point_1t)
+        Point_cr = self.__find_critical_point_1(self.__fPoint_0, self.__Point_1t)
 
         # Критический удельный объем
         v_1cr = Point_cr.v(0)
@@ -630,15 +639,21 @@ class Stage:
         """
             Выбирает сопловую решетку из таблицы, расположенной в Щегляеве, том 1
         """
-        self.__vane_grid = GridProfile(
-            M=self.__M_1t,           # Число Маха в рабочей решетке
-            type=0,                  # Тип решетки, 1 - рабочая
-            in_angle=self.__alpha_0, # Входной угол
-            out_angle=self.__alpha_1 # Выходной угол
-        )
-        # Если решетка не подобралась -> исключение
-        if not self.__vane_grid.isOK():
-            raise Exception('Vane Grid was not selected 0_0')
+        try:
+            self.__vane_grid = GridProfile(
+                M=self.__M_1t,           # Число Маха в рабочей решетке
+                type=0,                  # Тип решетки, 1 - рабочая
+                in_angle=self.__alpha_0, # Входной угол
+                out_angle=self.__alpha_1 # Выходной угол
+            )
+            # Если решетка не подобралась -> исключение
+            if not self.__vane_grid.isOK():
+                raise VaneGridException('Vane Grid was not selected 0_0')
+        except VaneGridException as e:
+            raise Exception('f')
+        
+        # Название сопловой решетки
+        self.__name_1 = self.__vane_grid.get_name()
         
         # Дробное число сопловых лопаток
         self.__z_1 = np.pi * self.__d / self.__vane_grid.get_rel_t() / b_1
@@ -674,16 +689,21 @@ class Stage:
         """
             Выбирает рабочую решетку из таблицы, расположенной в Щегляеве, том 1
         """
+        try:
+            self.__rotor_grid = GridProfile(
+                M=self.__M_2t,          # Число Маха в рабочей решетке
+                type=1,                 # Тип решетки, 1 - рабочая
+                in_angle=self.__beta_1, # Входной угол
+                out_angle=self.__beta_2 # Выходной угол
+            )
+            # Если решетка не подобралась -> исключение
+            if not self.__rotor_grid.isOK():
+                raise RotorGridException('Rotor Grid was not selected 0_0')
+        except RotorGridException as e:
+            raise Exception('f')
         
-        self.__rotor_grid = GridProfile(
-            M=self.__M_2t,          # Число Маха в рабочей решетке
-            type=1,                 # Тип решетки, 1 - рабочая
-            in_angle=self.__beta_1, # Входной угол
-            out_angle=self.__beta_2 # Выходной угол
-        )
-        # Если решетка не подобралась -> исключение
-        if not self.__rotor_grid.isOK():
-            raise Exception('Rotor Grid was not selected 0_0')
+         # Название рабочей решетки
+        self.__name_2 = self.__rotor_grid.get_name()
         
         # Дробное число рабочих лопаток
         self.__z_2 = np.pi * self.__d / self.__rotor_grid.get_rel_t() / b_2
@@ -757,7 +777,7 @@ class Stage:
                 te_radius = self.__R_edge_out_1,
                 chord = b,
                 height = self.__l_1,
-                nu = (self.__Point_0.kv() + self.__Point_1t.kv())/2,
+                nu = (self.__Point_0.kv(0) + self.__Point_1t.kv(0))/2,
                 ks = 1e-5,
                 w1 = self.__c_0,
                 w2 = self.__c_1
@@ -777,7 +797,7 @@ class Stage:
                 te_radius = self.__R_edge_out_2,
                 chord = b,
                 height = self.__l_2,
-                nu = (self.__Point_1.kv() + self.__Point_2t.kv())/2,
+                nu = (self.__Point_1.kv(0) + self.__Point_2t.kv(0))/2,
                 ks = 1e-5,
                 w1 = self.__w_1,
                 w2 = self.__w_2
@@ -838,6 +858,9 @@ class Stage:
         '''
         Последовательный расчет ступени
         '''
+        # 0.
+        speed_iterations_rotor = 0
+        speed_iterations_vane = 0
         
         # 1. Первое минимальное приближение хорд лопаток
         b_1 = 0.030
@@ -857,6 +880,8 @@ class Stage:
         
         # 3.
         while not(isBendingOK * isSpeedKoefsOK):
+            if (speed_iterations_vane > 20) or (speed_iterations_rotor > 20):
+                break
             
             # 3.1. Рассчитываем параметры для сопловой решетки в h,s-диаграммы
             self.__calculate_vane_thermal_points(phi=phi)
@@ -904,8 +929,11 @@ class Stage:
             # Если коэффициенты не совпали, то совершаем расчет заново
             if (round(new_phi, 3) != round(phi, 3)):
                 phi = new_phi
+                speed_iterations_vane += 1
+                
             if (round(new_psi, 3) != round(psi, 3)):
                 psi = new_psi
+                speed_iterations_rotor +=1
             
             
         self.__b_1 = b_1
@@ -945,10 +973,71 @@ class Stage:
             'E_0':      self.__E_0,
             'b_1':      self.__b_1,
             'b_2':      self.__b_2,
-            'Name_1':   self.__vane_grid.get_name(),
-            'Name_2':   self.__rotor_grid.get_name()
+            'Name_1':   self.__name_1,
+            'Name_2':   self.__name_2,
+            'Nu':       self.__Nu
         }
     
+    def generate_tex(self, path):
+        
+        class_variables_dict = vars(self)
+        names_list = list(class_variables_dict)
+        var_list = [(item[8:], (class_variables_dict[item]), type(class_variables_dict[item])) for item in names_list]
+        
+        # var_list = []
+        # for item in names_list:
+        #     if isinstance(item, [np.float):
+        #         var_list.append( (item[8:], float(class_variables_dict[item]), type(class_variables_dict[item])) )
+        
+        local_path = str(pathlib.Path().resolve()) + r'\API\tex\stage_free.tex'
+        
+        thermal_points_list = {
+            'Point_0':      self.__Point_0,
+            'Point_1':      self.__Point_1,
+            'Point_1t':     self.__Point_1t,
+            'Point_2':      self.__Point_2,
+            'Point_2t':     self.__Point_2t,
+            'Point_2tt':    self.__Point_2tt,
+            'Point_0':      self.__fPoint_0,
+            'Point_1':      self.__fPoint_1,
+            'Point_outt':   self.__Point_outt,
+            'Point_out':    self.__Point_out
+        }
+        
+        
+        
+        thermal_parameters_list = []
+        
+        for point_name in list(thermal_points_list):
+            theraml_parameters_dict = thermal_points_list[point_name].GetNameValueDict(0)
+            thermal_names_list = list(theraml_parameters_dict)
+            thermal_namevalue_list = [
+                (point_name+'.'+name, float(theraml_parameters_dict[name]), type(float(theraml_parameters_dict[name]))) for name in thermal_names_list
+            ]
+            thermal_parameters_list.append(thermal_namevalue_list)
+            
+        
+        var_list = list(chain(var_list, *thermal_parameters_list))
+        
+        # print('loc: ', local_path)
+        
+        with open(local_path, 'r', encoding='utf-8') as file:
+            lines = file.readlines()
+            new_text = ''
+            for line in lines:
+                new_text += line
+                
+            all_text = tlstr.tlstr(new_text)
+            all_text = all_text.dformat(inlist=var_list,mode=1)
+        
+        with open(path, 'w', encoding='utf-8') as file:
+            file.write(str(all_text))
+
+        # print(var_list)
+        
+        
+            
+    def isOK(self) -> bool: return self.__isOK
     def get_l_1(self): return self.__l_1
     def get_reaction(self): return self.__reaction
     def get_d(self): return self.__d
@@ -1110,7 +1199,8 @@ class GridProfile:
             )
             
         except Exception as ex:
-            print(*ex.args)
+            pass
+            # print(*ex.args)
     
     def __str__(self) -> str:
         loc_str = ''
@@ -1153,3 +1243,8 @@ class GridProfile:
     def isOK(self):
         if len(self.__name_list) != 0: return True
         else: return False
+        
+class RotorGridException(Exception):
+    pass
+class VaneGridException(Exception):
+    pass
