@@ -11,7 +11,7 @@ from itertools import chain
 from . import ThPoint
 from . import calculate_losses
 from . import tlstr
-
+from .CustomBladesProfiles import *
 
 
 
@@ -39,7 +39,7 @@ class Stage:
         extra_param:dict = {},
         
         kappa_vs = 0.5,
-    
+        auto_profile = False,
         **kwargs
     ):
         ''' 
@@ -239,6 +239,10 @@ class Stage:
         
         self.__name_1       = None      # ...        Название сопловой решетки
         self.__name_2       = None      # ...        Название сопловой решетки
+        
+        # Флаги ~~~~
+        
+        self.__isProfileAuto = auto_profile # примерный расчет профилей ступеней
         
         # Основной расчет ступени 
         try:
@@ -639,126 +643,194 @@ class Stage:
         """
             Выбирает сопловую решетку из таблицы, расположенной в Щегляеве, том 1
         """
-        try:
-            self.__vane_grid = GridProfile(
-                M=self.__M_1t,           # Число Маха в рабочей решетке
-                type=0,                  # Тип решетки, 1 - рабочая
-                in_angle=self.__alpha_0, # Входной угол
-                out_angle=self.__alpha_1 # Выходной угол
-            )
-            # Если решетка не подобралась -> исключение
-            if not self.__vane_grid.isOK():
-                raise VaneGridException('Vane Grid was not selected 0_0')
-        except VaneGridException as e:
-            raise Exception('f')
+        if not(self.__isProfileAuto):
+            try:
+                self.__vane_grid = GridProfile(
+                    M=self.__M_1t,           # Число Маха в рабочей решетке
+                    type=0,                  # Тип решетки, 1 - рабочая
+                    in_angle=self.__alpha_0, # Входной угол
+                    out_angle=self.__alpha_1 # Выходной угол
+                )
+                # Если решетка не подобралась -> исключение
+                if not self.__vane_grid.isOK():
+                    raise VaneGridException('Vane Grid was not selected 0_0')
+            except VaneGridException as e:
+                raise Exception('f')
+            
+            # Название сопловой решетки
+            self.__name_1 = self.__vane_grid.get_name()
+            
+            # Дробное число сопловых лопаток
+            self.__z_1 = np.pi * self.__d / self.__vane_grid.get_rel_t() / b_1
+            
+            # Целое число сопловых лопаток (четное)
+            self.__z_1 = round(self.__z_1 / 2) * 2
+            
+            # Шаг сопловой решетки
+            self.__t_1 = np.pi * self.__d / self.__z_1
+            
+            # Относительный шаг сопловой решетки
+            self.__t_1_rel = self.__t_1 / b_1
+            
+            # Рассчет установочного угла
+            self.__alpha_inst = self.__vane_grid.calculate_inst_angle(in_angle=self.__alpha_0, t_rel = self.__t_1_rel)
+            
+            # Масштаб для сопловой решетки
+            self.__scale_1 = b_1 / self.__vane_grid.get_b()
+            
+            # Ширина сопловой решетки
+            self.__B_1 = b_1 * np.sin(np.deg2rad(self.__alpha_inst))
+            
+            # Горло сопловой решетки
+            self.__throat_1 = self.__scale_1 * self.__vane_grid.get_a()
+            
+            # Радиусы входной и выходной кромок
+            self.__R_edge_in_1 = self.__scale_1 * self.__vane_grid.get_Delta_in()
+            self.__R_edge_out_1 = self.__scale_1 * self.__vane_grid.get_Delta_out()
         
-        # Название сопловой решетки
-        self.__name_1 = self.__vane_grid.get_name()
-        
-        # Дробное число сопловых лопаток
-        self.__z_1 = np.pi * self.__d / self.__vane_grid.get_rel_t() / b_1
-        
-        # Целое число сопловых лопаток (четное)
-        self.__z_1 = round(self.__z_1 / 2) * 2
-        
-        # Шаг сопловой решетки
-        self.__t_1 = np.pi * self.__d / self.__z_1
-        
-        # Относительный шаг сопловой решетки
-        self.__t_1_rel = self.__t_1 / b_1
-        
-        # Рассчет установочного угла
-        self.__alpha_inst = self.__vane_grid.calculate_inst_angle(in_angle=self.__alpha_0, t_rel = self.__t_1_rel)
-        
-        # Масштаб для сопловой решетки
-        self.__scale_1 = b_1 / self.__vane_grid.get_b()
-        
-        # Ширина сопловой решетки
-        self.__B_1 = b_1 * np.sin(np.deg2rad(self.__alpha_inst))
-        
-        # Горло сопловой решетки
-        self.__throat_1 = self.__scale_1 * self.__vane_grid.get_a()
-        
-        # Радиусы входной и выходной кромок
-        self.__R_edge_in_1 = self.__scale_1 * self.__vane_grid.get_Delta_in()
-        self.__R_edge_out_1 = self.__scale_1 * self.__vane_grid.get_Delta_out()
-        
+        else:
+            # Название сопловой решетки
+            self.__name_1 = 'Custom Vane'
+            
+            # Дробное число сопловых лопаток
+            opt_rel_t = calculate_rel_t(self.__alpha_0, self.__alpha_1, self.__c_1, self.__Point_1)
+            self.__z_1 = np.pi * self.__d / opt_rel_t / b_1
+            
+            # Целое число сопловых лопаток (четное)
+            self.__z_1 = round(self.__z_1 / 2) * 2
+            
+            # Шаг сопловой решетки
+            self.__t_1 = np.pi * self.__d / self.__z_1
+            
+            # Относительный шаг сопловой решетки
+            self.__t_1_rel = self.__t_1 / b_1
+            
+            # Рассчет установочного угла
+            self.__alpha_inst = calculate_inst_angle(self.__alpha_0, self.__alpha_1)
+            
+            # Масштаб для сопловой решетки
+            self.__scale_1 = 1
+            
+            # Ширина сопловой решетки
+            self.__B_1 = b_1 * np.sin(np.deg2rad(self.__alpha_inst))
+            
+            # Горло сопловой решетки
+            self.__throat_1 = calculate_throat(self.__c_1, self.__t_1, self.__Point_1)
+            
+            # Радиусы входной и выходной кромок
+            self.__R_edge_in_1, self.__R_edge_out_1 = calculate_edge_radiuses(b_1, type='s')
         
     
     def __select_rotor_grid(self,b_2):
         """
             Выбирает рабочую решетку из таблицы, расположенной в Щегляеве, том 1
         """
-        try:
-            self.__rotor_grid = GridProfile(
-                M=self.__M_2t,          # Число Маха в рабочей решетке
-                type=1,                 # Тип решетки, 1 - рабочая
-                in_angle=self.__beta_1, # Входной угол
-                out_angle=self.__beta_2 # Выходной угол
-            )
-            # Если решетка не подобралась -> исключение
-            if not self.__rotor_grid.isOK():
-                raise RotorGridException('Rotor Grid was not selected 0_0')
-        except RotorGridException as e:
-            raise Exception('f')
-        
-         # Название рабочей решетки
-        self.__name_2 = self.__rotor_grid.get_name()
-        
-        # Дробное число рабочих лопаток
-        self.__z_2 = np.pi * self.__d / self.__rotor_grid.get_rel_t() / b_2
-        
-        # Целое число рабочих лопаток (четное)
-        self.__z_2 = int(self.__z_1)
-        
-        # Шаг рабочих решетки
-        self.__t_2 = np.pi * self.__d / self.__z_2
-        
-        # Относительный шаг рабочих решетки
-        self.__t_2_rel = self.__t_2 / b_2
-        
-        # Рассчет установочного угла
-        self.__beta_inst = self.__rotor_grid.calculate_inst_angle(in_angle=self.__beta_1, t_rel = self.__t_2_rel)
-        
-        # Масштаб для сопловой решетки
-        self.__scale_2 = b_2 / self.__rotor_grid.get_b()
-        
-        # Ширина сопловой решетки
-        self.__B_2 = b_2 * np.sin(np.deg2rad(self.__beta_inst))
-        
-        # Горло сопловой решетки
-        self.__throat_2 = self.__scale_2 * self.__rotor_grid.get_a()
-        
-        # Радиусы входной и выходной кромок
-        self.__R_edge_in_2 = self.__scale_2 * self.__rotor_grid.get_Delta_in()
-        self.__R_edge_out_2 = self.__scale_2 * self.__rotor_grid.get_Delta_out()
+        if not(self.__isProfileAuto):
+            try:
+                self.__rotor_grid = GridProfile(
+                    M=self.__M_2t,          # Число Маха в рабочей решетке
+                    type=1,                 # Тип решетки, 1 - рабочая
+                    in_angle=self.__beta_1, # Входной угол
+                    out_angle=self.__beta_2 # Выходной угол
+                )
+                # Если решетка не подобралась -> исключение
+                if not self.__rotor_grid.isOK():
+                    raise RotorGridException('Rotor Grid was not selected 0_0')
+            except RotorGridException as e:
+                raise Exception('f')
+            
+            # Название рабочей решетки
+            self.__name_2 = self.__rotor_grid.get_name()
+            
+            # Дробное число рабочих лопаток
+            self.__z_2 = np.pi * self.__d / self.__rotor_grid.get_rel_t() / b_2
+            
+            # Целое число рабочих лопаток (четное)
+            self.__z_2 = int(self.__z_2)
+            
+            # Шаг рабочих решетки
+            self.__t_2 = np.pi * self.__d / self.__z_2
+            
+            # Относительный шаг рабочих решетки
+            self.__t_2_rel = self.__t_2 / b_2
+            
+            # Рассчет установочного угла
+            self.__beta_inst = self.__rotor_grid.calculate_inst_angle(in_angle=self.__beta_1, t_rel = self.__t_2_rel)
+            
+            # Масштаб для сопловой решетки
+            self.__scale_2 = b_2 / self.__rotor_grid.get_b()
+            
+            # Ширина сопловой решетки
+            self.__B_2 = b_2 * np.sin(np.deg2rad(self.__beta_inst))
+            
+            # Горло сопловой решетки
+            self.__throat_2 = self.__scale_2 * self.__rotor_grid.get_a()
+            
+            # Радиусы входной и выходной кромок
+            self.__R_edge_in_2 = self.__scale_2 * self.__rotor_grid.get_Delta_in()
+            self.__R_edge_out_2 = self.__scale_2 * self.__rotor_grid.get_Delta_out()
+            
+        else:
+            # Название рабочей решетки
+            self.__name_2 = 'Custom Blades'
+            
+            # Дробное число рабочих лопаток
+            opt_rel_t = calculate_rel_t(self.__beta_1, self.__beta_2, self.__w_2, self.__Point_2)
+            self.__z_2 = np.pi * self.__d / opt_rel_t / b_2
+            
+            # Целое число рабочих лопаток (четное)
+            self.__z_2 = int(self.__z_2)
+            
+            # Шаг сопловой решетки
+            self.__t_2 = np.pi * self.__d / self.__z_2
+            
+            # Относительный шаг сопловой решетки
+            self.__t_2_rel = self.__t_2 / b_2
+            
+            # Рассчет установочного угла
+            self.__beta_inst = calculate_inst_angle(self.__beta_1, self.__beta_2)
+            
+            # Масштаб для сопловой решетки
+            self.__scale_2 = 1
+            
+            # Ширина сопловой решетки
+            self.__B_2 = b_2 * np.sin(np.deg2rad(self.__beta_inst))
+            
+            # Горло сопловой решетки
+            self.__throat_2 = calculate_throat(self.__w_2, self.__t_2, self.__Point_2)
+            
+            # Радиусы входной и выходной кромок
+            self.__R_edge_in_2, self.__R_edge_out_2 = calculate_edge_radiuses(b_2, type='r')
         
         
     # TODO
     def __check_bending_stresses(self, b_2) -> bool:
-        # Момент сопротивления по кромкам по оси XX
-        W_min = self.__rotor_grid.get_Wxx_edge() * np.power(b_2 / self.__rotor_grid.get_b(), 3)
-        
-        # Число рабочих лопаток
-        z_2 = np.pi * self.__d / b_2 / self.__rotor_grid.get_rel_t()
-        
-        # Целое число рабочих лопаток
-        if (abs(int(z_2) - z_2) != 0):
-            z_2new = int(z_2) + 1
-        else:
-            z_2new = int(z_2)
-            
-        # Радиальное усилие
-        Ru = self.__G_0 * (self.__w_1 * np.cos(np.deg2rad(self.__beta_1)) + self.__w_2 * np.cos(np.deg2rad(self.__beta_2)))
-        
-        # Изгибающее напряжение
-        sigma_bend = Ru * self.__l_2 / 2 / z_2new / W_min / 1_000_000
-        
-        # TODO проверка только для стали
-        if (sigma_bend < 27.5):
+        if self.__isProfileAuto:
             return True
         else:
-            return False
+            # Момент сопротивления по кромкам по оси XX
+            W_min = self.__rotor_grid.get_Wxx_edge() * np.power(b_2 / self.__rotor_grid.get_b(), 3)
+            
+            # Число рабочих лопаток
+            z_2 = np.pi * self.__d / b_2 / self.__rotor_grid.get_rel_t()
+            
+            # Целое число рабочих лопаток
+            if (abs(int(z_2) - z_2) != 0):
+                z_2new = int(z_2) + 1
+            else:
+                z_2new = int(z_2)
+                
+            # Радиальное усилие
+            Ru = self.__G_0 * (self.__w_1 * np.cos(np.deg2rad(self.__beta_1)) + self.__w_2 * np.cos(np.deg2rad(self.__beta_2)))
+            
+            # Изгибающее напряжение
+            sigma_bend = Ru * self.__l_2 / 2 / z_2new / W_min / 1_000_000
+            
+            # TODO проверка только для стали
+            if (sigma_bend < 27.5):
+                return True
+            else:
+                return False
 
     def __calculate_losses(self, type, b):
         '''
@@ -899,14 +971,16 @@ class Stage:
             # 3.5. Рассчитываем площадь и длину рабочей лопатки
             self.__calculate_rotor_area_and_length(psi=psi, mu_2=mu_2)
             
+            # 3.7. Рассчитываем треугольник скоростей в рабочей решетке 
+            self.__calculate_rotor_speed_triangle(psi=psi)
+            
             # 3.6.0 Подбираем сопловую решетку
             self.__select_vane_grid(b_1=b_1)
             
             # 3.6.1 Подбираем рабочую решетку
             self.__select_rotor_grid(b_2=b_2)
             
-            # 3.7. Рассчитываем треугольник скоростей в рабочей решетке 
-            self.__calculate_rotor_speed_triangle(psi=psi)
+            
             
             # 3.8. Проверяем рабочую решетку на изгиб
             if not(self.__check_bending_stresses(b_2=b_2)):
@@ -976,6 +1050,20 @@ class Stage:
             'Name_1':   self.__name_1,
             'Name_2':   self.__name_2,
             'Nu':       self.__Nu
+        }
+    
+    def get_thermal_points(self):
+        return {
+            'f0'  : self.__fPoint_0,
+            '0'   : self.__Point_0,
+            '1t'  : self.__Point_1t,
+            '1'   : self.__Point_1,
+            '2t'  : self.__Point_2t,
+            '2'   : self.__Point_2,
+            'f1'  : self.__fPoint_1,
+            '2tt' : self.__Point_2tt,
+            'out' : self.__Point_out,
+            'outt': self.__Point_outt
         }
     
     def generate_tex(self, path):
